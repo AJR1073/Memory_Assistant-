@@ -33,16 +33,29 @@ export default function Practice() {
     details?: string;
   } | null>(null);
 
-  const handleSpeechResult = useCallback((text: string) => {
-    setUserInput(text);
-  }, []);
+  const handleSpeechResult = useCallback(
+    (result: { text: string; isFinal: boolean; isNewSentence: boolean }) => {
+      if (!result.isFinal) return; // Only handle final results
+      
+      setUserInput((prevInput) => {
+        const currentInput = String(prevInput || '');
+        // Always append with a space if there's existing text
+        return currentInput ? `${currentInput} ${result.text}` : result.text;
+      });
+    },
+    []
+  );
 
   const handleSpeechError = useCallback((error: string) => {
     setSpeechError(error);
+    setFeedback({
+      message: error,
+      severity: 'error'
+    });
   }, []);
 
   const {
-    isListening,
+    isListening: isSpeechListening,
     startListening,
     stopListening,
     hasSupport,
@@ -50,6 +63,26 @@ export default function Practice() {
     onResult: handleSpeechResult,
     onError: handleSpeechError,
   });
+
+  // Display speech recognition status
+  useEffect(() => {
+    if (speechError) {
+      setFeedback({
+        message: "Speech Recognition Error",
+        severity: "error",
+        details: speechError
+      });
+    }
+  }, [speechError]);
+
+  const toggleListening = async () => {
+    if (isSpeechListening) {
+      stopListening();
+    } else {
+      setFeedback(null);
+      await startListening();
+    }
+  };
 
   // Set initial verse based on verseId or random selection
   useEffect(() => {
@@ -68,14 +101,6 @@ export default function Practice() {
       }
     }
   }, [loading, verses.length, verseId, navigate]);
-
-  const toggleListening = () => {
-    if (isListening) {
-      stopListening();
-    } else {
-      startListening();
-    }
-  };
 
   const checkVerse = (input: string, verse: Verse) => {
     // Remove punctuation and convert to lowercase for comparison
@@ -243,7 +268,7 @@ export default function Practice() {
               value={userInput}
               onChange={(e) => setUserInput(e.target.value)}
               autoFocus
-              disabled={isListening}
+              disabled={isSpeechListening}
             />
             {hasSupport && (
               <Box
@@ -256,33 +281,20 @@ export default function Practice() {
                   borderRadius: '4px',
                 }}
               >
-                <Tooltip title={isListening ? 'Stop speaking' : 'Start speaking'}>
+                <Tooltip title={isSpeechListening ? "Stop Listening" : "Start Listening"}>
                   <IconButton
                     onClick={toggleListening}
-                    color={isListening ? 'error' : 'primary'}
-                    sx={{
-                      animation: isListening ? 'pulse 1.5s infinite' : 'none',
-                      '@keyframes pulse': {
-                        '0%': {
-                          transform: 'scale(1)',
-                        },
-                        '50%': {
-                          transform: 'scale(1.1)',
-                        },
-                        '100%': {
-                          transform: 'scale(1)',
-                        },
-                      },
-                    }}
+                    color={isSpeechListening ? "error" : "primary"}
+                    sx={{ ml: 1 }}
                   >
-                    {isListening ? <MicOffIcon /> : <MicIcon />}
+                    {isSpeechListening ? <MicOffIcon /> : <MicIcon />}
                   </IconButton>
                 </Tooltip>
               </Box>
             )}
           </Box>
 
-          <Box sx={{ mt: 3, display: 'flex', gap: 2 }}>
+          <Box sx={{ mt: 3, display: 'flex', gap: 2, alignItems: 'center' }}>
             <Button
               type="submit"
               variant="contained"
@@ -298,6 +310,17 @@ export default function Practice() {
               >
                 Next Verse
               </Button>
+            )}
+            {hasSupport && (
+              <Tooltip title={isSpeechListening ? "Stop Listening" : "Start Listening"}>
+                <IconButton
+                  onClick={toggleListening}
+                  color={isSpeechListening ? "error" : "primary"}
+                  sx={{ ml: 1 }}
+                >
+                  {isSpeechListening ? <MicOffIcon /> : <MicIcon />}
+                </IconButton>
+              </Tooltip>
             )}
             <Button
               variant="outlined"
