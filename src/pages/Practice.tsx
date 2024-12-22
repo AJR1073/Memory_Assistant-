@@ -18,12 +18,16 @@ import {
 } from '@mui/icons-material';
 import { useVerses } from '../hooks/useVerses';
 import { useBrowserSpeechRecognition } from '../hooks/useBrowserSpeechRecognition';
+import { useAuth } from '../contexts/AuthContext';
+import { doc, setDoc, getDoc, increment } from 'firebase/firestore';
+import { db } from '../firebase/config';
 import type { Verse } from '../types';
 
 export default function Practice() {
   const navigate = useNavigate();
   const { verseId } = useParams<{ verseId?: string }>();
   const { verses, loading, error } = useVerses();
+  const { currentUser } = useAuth();
   const [currentVerse, setCurrentVerse] = useState<Verse | null>(null);
   const [userInput, setUserInput] = useState('');
   const [speechError, setSpeechError] = useState<string | null>(null);
@@ -133,6 +137,45 @@ export default function Practice() {
     };
   };
 
+  const updateLeaderboard = async (accuracy: number) => {
+    if (!currentUser) {
+      console.log('No current user, skipping leaderboard update');
+      return;
+    }
+    
+    try {
+      console.log('Updating leaderboard for user:', currentUser.uid, 'with accuracy:', accuracy);
+      const leaderboardRef = doc(db, 'leaderboard', currentUser.uid);
+      const leaderboardDoc = await getDoc(leaderboardRef);
+      
+      const points = accuracy >= 95 ? 10 : accuracy >= 80 ? 5 : 2;
+      console.log('Points to award:', points);
+      
+      if (leaderboardDoc.exists()) {
+        console.log('Updating existing leaderboard entry');
+        await setDoc(leaderboardRef, {
+          totalScore: increment(points),
+          versesMemorized: increment(1),
+          lastUpdated: new Date(),
+          userId: currentUser.uid,
+          initials: currentUser.email?.substring(0, 2).toUpperCase() || 'AA'
+        }, { merge: true });
+      } else {
+        console.log('Creating new leaderboard entry');
+        await setDoc(leaderboardRef, {
+          userId: currentUser.uid,
+          initials: currentUser.email?.substring(0, 2).toUpperCase() || 'AA',
+          totalScore: points,
+          versesMemorized: 1,
+          lastUpdated: new Date()
+        });
+      }
+      console.log('Leaderboard update successful');
+    } catch (error) {
+      console.error('Error updating leaderboard:', error);
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (currentVerse && userInput.trim()) {
@@ -145,6 +188,8 @@ export default function Practice() {
             ? "Perfect match!"
             : `Accuracy: ${result.similarity}%`
         });
+        // Update leaderboard when verse is correct
+        updateLeaderboard(result.similarity);
       } else {
         let details = `Accuracy: ${result.similarity}%\n`;
         if (result.missingWords.length > 0) {

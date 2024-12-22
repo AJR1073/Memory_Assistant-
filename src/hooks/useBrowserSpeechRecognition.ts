@@ -1,54 +1,53 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 
 interface UseSpeechRecognitionProps {
-  onResult?: (transcript: { text: string, isFinal: boolean, isNewSentence: boolean }) => void;
+  onResult?: (result: { text: string; isFinal: boolean; isNewSentence: boolean }) => void;
   onError?: (error: string) => void;
   language?: string;
 }
 
+interface SpeechRecognitionInstance {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  maxAlternatives: number;
+  onstart: () => void;
+  onresult: (event: any) => void;
+  onerror: (event: any) => void;
+  onend: () => void;
+  start: () => void;
+  stop: () => void;
+}
+
+type SpeechRecognitionConstructor = {
+  new (): SpeechRecognitionInstance;
+};
+
 declare global {
   interface Window {
-    webkitSpeechRecognition: any;
-    SpeechRecognition: any;
-    mozSpeechRecognition: any;
-    msSpeechRecognition: any;
+    webkitSpeechRecognition: SpeechRecognitionConstructor;
+    SpeechRecognition: SpeechRecognitionConstructor;
   }
 }
 
 // Get the appropriate speech recognition constructor for the browser
-const getSpeechRecognition = () => {
+const getSpeechRecognition = (): SpeechRecognitionConstructor | null => {
   if (typeof window === 'undefined') return null;
 
   // Standard SpeechRecognition for Firefox
-  if ('SpeechRecognition' in window) {
+  if ('SpeechRecognition' in (window as any)) {
     console.log('Using standard SpeechRecognition');
-    return window.SpeechRecognition;
+    return (window as any).SpeechRecognition;
   }
   
   // Webkit prefixed for Chrome, Safari, Edge
-  if ('webkitSpeechRecognition' in window) {
+  if ('webkitSpeechRecognition' in (window as any)) {
     console.log('Using webkitSpeechRecognition');
-    return window.webkitSpeechRecognition;
+    return (window as any).webkitSpeechRecognition;
   }
 
   console.log('No speech recognition support found');
   return null;
-};
-
-const getBrowserName = () => {
-  const userAgent = navigator.userAgent.toLowerCase();
-  
-  if (userAgent.includes('firefox')) {
-    return 'Firefox';
-  } else if (userAgent.includes('edg/')) {
-    return 'Edge';
-  } else if (userAgent.includes('chrome')) {
-    return 'Chrome';
-  } else if (userAgent.includes('safari')) {
-    return 'Safari';
-  } else {
-    return 'your browser';
-  }
 };
 
 export function useBrowserSpeechRecognition({
@@ -58,10 +57,8 @@ export function useBrowserSpeechRecognition({
 }: UseSpeechRecognitionProps = {}) {
   const [isListening, setIsListening] = useState(false);
   const [hasSupport, setHasSupport] = useState(false);
-  const recognitionRef = useRef<any>(null);
+  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const transcriptRef = useRef('');
-  const shouldRestartRef = useRef(false);
-  const lastResultRef = useRef<{text: string, timestamp: number}>({ text: '', timestamp: 0 });
 
   // Initialize recognition instance
   useEffect(() => {
@@ -86,12 +83,10 @@ export function useBrowserSpeechRecognition({
       recognitionInstance.onstart = () => {
         console.log('Speech recognition started');
         setIsListening(true);
-        shouldRestartRef.current = true;
       };
 
       recognitionInstance.onresult = (event: any) => {
         let finalTranscript = '';
-        let interimTranscript = '';
 
         for (let i = event.resultIndex; i < event.results.length; i++) {
           const transcript = event.results[i][0].transcript;
@@ -99,8 +94,6 @@ export function useBrowserSpeechRecognition({
           
           if (event.results[i].isFinal) {
             finalTranscript = transcript;
-          } else {
-            interimTranscript = transcript;
           }
         }
 
@@ -122,25 +115,21 @@ export function useBrowserSpeechRecognition({
         switch (event.error) {
           case 'not-allowed':
             errorMessage = 'Microphone access was denied. Please allow microphone access in your browser settings and try again.';
-            shouldRestartRef.current = false;
             break;
           case 'no-speech':
             errorMessage = 'No speech was detected. Please try speaking again.';
             break;
           case 'network':
             errorMessage = 'Network error occurred. Please check your internet connection.';
-            shouldRestartRef.current = false;
             break;
           case 'audio-capture':
             errorMessage = 'No microphone was found. Please check your microphone connection.';
-            shouldRestartRef.current = false;
             break;
           case 'aborted':
             errorMessage = 'Speech recognition was aborted.';
             break;
           case 'language-not-supported':
             errorMessage = `The language ${language} is not supported. Please try a different language.`;
-            shouldRestartRef.current = false;
             break;
           default:
             errorMessage = `Speech recognition error: ${event.error}`;
@@ -152,28 +141,12 @@ export function useBrowserSpeechRecognition({
 
       recognitionInstance.onend = () => {
         console.log('Speech recognition ended');
-        
-        // Only restart if we haven't explicitly stopped and should restart
-        if (shouldRestartRef.current && recognitionRef.current) {
-          console.log('Restarting speech recognition...');
-          setTimeout(() => {
-            try {
-              recognitionInstance.start();
-            } catch (error) {
-              console.error('Error restarting recognition:', error);
-              setIsListening(false);
-              onError?.('Speech recognition stopped unexpectedly. Please try again.');
-            }
-          }, 100);
-        } else {
-          setIsListening(false);
-        }
+        setIsListening(false);
       };
 
       recognitionRef.current = recognitionInstance;
 
       return () => {
-        shouldRestartRef.current = false;
         if (recognitionRef.current) {
           try {
             recognitionRef.current.stop();
@@ -185,14 +158,14 @@ export function useBrowserSpeechRecognition({
       };
     } catch (error) {
       console.error('Error initializing speech recognition:', error);
-      onError?.('Error initializing speech recognition. Please try using Chrome or Edge.');
+      onError?.('Error initializing speech recognition. Please try using Chrome.');
       setHasSupport(false);
     }
   }, [language, onError]);
 
   const startListening = useCallback(async () => {
     if (!recognitionRef.current) {
-      onError?.('Speech recognition not initialized. Please try using Chrome or Edge.');
+      onError?.('Speech recognition not initialized. Please try using Chrome.');
       return;
     }
     
@@ -200,7 +173,6 @@ export function useBrowserSpeechRecognition({
       // Request microphone permission explicitly
       await navigator.mediaDevices.getUserMedia({ audio: true });
       
-      shouldRestartRef.current = true;
       transcriptRef.current = '';
       recognitionRef.current.start();
     } catch (error) {
@@ -214,7 +186,6 @@ export function useBrowserSpeechRecognition({
   }, [onError]);
 
   const stopListening = useCallback(() => {
-    shouldRestartRef.current = false;
     if (!recognitionRef.current) return;
     
     try {
@@ -229,6 +200,5 @@ export function useBrowserSpeechRecognition({
     startListening,
     stopListening,
     hasSupport,
-    transcript: transcriptRef.current,
   };
 }

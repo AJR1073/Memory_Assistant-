@@ -8,12 +8,11 @@ export interface UserProfile {
 
 export interface Verse {
   id: string;
-  userId: string;
   reference: string;
   text: string;
-  translation: string;
-  createdAt: Date;
-  lastPracticed?: Date;
+  userId: string;
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 export interface PracticeAttempt {
@@ -28,6 +27,7 @@ export interface PracticeAttempt {
 }
 
 export interface LeaderboardEntry {
+  id: string;
   userId: string;
   initials: string;
   totalScore: number;

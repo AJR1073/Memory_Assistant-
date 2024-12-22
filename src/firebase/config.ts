@@ -1,26 +1,36 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, connectAuthEmulator } from 'firebase/auth';
-import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
+import { getFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyANlc1RoLOUnieWKpgiZd5Z0rMk6KvL59s",
-  authDomain: "memoryassistant-75220.firebaseapp.com",
-  projectId: "memoryassistant-75220",
-  storageBucket: "memoryassistant-75220.firebasestorage.app",
-  messagingSenderId: "271474504743",
-  appId: "1:271474504743:web:0ea10380ddf7c15a7e4a02",
-  measurementId: "G-JBGG594JZK"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
+// Debug logging
+console.log('Firebase config:', {
+  ...firebaseConfig,
+  apiKey: firebaseConfig.apiKey ? '[HIDDEN]' : undefined,
+});
 
-// Enable persistence
-if (window.location.hostname === 'localhost') {
-  // connectAuthEmulator(auth, 'http://localhost:9099');
-  // connectFirestoreEmulator(db, 'localhost', 8080);
+if (!firebaseConfig.apiKey || !firebaseConfig.authDomain || !firebaseConfig.projectId) {
+  throw new Error('Missing required Firebase configuration. Check your .env file.');
 }
 
-export { auth, db };
+const app = initializeApp(firebaseConfig);
+export const auth = getAuth(app);
+export const db = getFirestore(app);
+
+// Initialize Firebase Performance Monitoring
+if (firebaseConfig.measurementId) {
+  import('firebase/performance').then(({ getPerformance }) => {
+    getPerformance(app);
+  }).catch((error) => {
+    console.error('Error initializing performance monitoring:', error);
+  });
+}

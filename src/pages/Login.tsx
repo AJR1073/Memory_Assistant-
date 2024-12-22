@@ -23,13 +23,22 @@ export default function Login() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!email.trim() || !password.trim()) {
+      setError('Please enter both email and password');
+      return;
+    }
+    
     try {
       setError('');
       setLoading(true);
       await login(email, password);
       navigate('/dashboard');
     } catch (err) {
-      setError('Failed to sign in. Please check your credentials.');
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('An unexpected error occurred. Please try again.');
+      }
       console.error('Login error:', err);
     } finally {
       setLoading(false);

@@ -15,7 +15,7 @@ import {
   Snackbar,
   Tooltip,
 } from '@mui/material';
-import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon, School as SchoolIcon } from '@mui/icons-material';
+import { Add as AddIcon, Delete as DeleteIcon, School as SchoolIcon } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../firebase/config';
 import { collection, query, where, getDocs, deleteDoc, doc } from 'firebase/firestore';
@@ -69,20 +69,17 @@ export default function Dashboard() {
     navigate('/add-verse');
   };
 
-  const handleEditVerse = (verseId: string) => {
-    navigate(`/edit-verse/${verseId}`);
-  };
-
-  const handlePracticeVerse = (verseId: string) => {
-    navigate(`/practice/${verseId}`);
-  };
-
   const handleDeleteVerse = async (verseId: string) => {
+    if (!window.confirm('Are you sure you want to delete this verse?')) {
+      return;
+    }
+    
     try {
-      await deleteDoc(doc(db, 'verses', verseId));
-      setVerses(verses.filter((verse) => verse.id !== verseId));
-    } catch (err) {
-      console.error('Error deleting verse:', err);
+      const verseRef = doc(db, 'verses', verseId);
+      await deleteDoc(verseRef);
+      setVerses(verses.filter(verse => verse.id !== verseId));
+    } catch (error) {
+      console.error('Error deleting verse:', error);
       setDeleteError('Failed to delete verse. Please try again.');
     }
   };
@@ -153,21 +150,9 @@ export default function Dashboard() {
                       <SchoolIcon />
                     </IconButton>
                   </Tooltip>
-                  <Tooltip title="Edit verse">
-                    <IconButton
-                      onClick={() => navigate(`/edit-verse/${verse.id}`)}
-                      color="primary"
-                    >
-                      <EditIcon />
-                    </IconButton>
-                  </Tooltip>
                   <Tooltip title="Delete verse">
                     <IconButton
-                      onClick={() => {
-                        if (window.confirm('Are you sure you want to delete this verse?')) {
-                          handleDeleteVerse(verse.id);
-                        }
-                      }}
+                      onClick={() => handleDeleteVerse(verse.id)}
                       color="error"
                     >
                       <DeleteIcon />
