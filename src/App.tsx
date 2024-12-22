@@ -61,6 +61,14 @@ function App() {
               }
             />
             <Route
+              path="/practice"
+              element={
+                <PrivateRoute>
+                  <Practice />
+                </PrivateRoute>
+              }
+            />
+            <Route
               path="/practice/:verseId"
               element={
                 <PrivateRoute>

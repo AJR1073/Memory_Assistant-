@@ -144,42 +144,34 @@ export default function Dashboard() {
                     {verse.text}
                   </Typography>
                 </CardContent>
-                <CardActions sx={{ justifyContent: 'space-between' }}>
-                  <Box>
-                    <Tooltip title="Edit verse">
-                      <IconButton
-                        size="small"
-                        onClick={() => handleEditVerse(verse.id)}
-                        aria-label="edit"
-                      >
-                        <EditIcon />
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip title="Delete verse">
-                      <IconButton
-                        size="small"
-                        onClick={() => {
-                          if (window.confirm('Are you sure you want to delete this verse?')) {
-                            handleDeleteVerse(verse.id);
-                          }
-                        }}
-                        aria-label="delete"
-                        color="error"
-                      >
-                        <DeleteIcon />
-                      </IconButton>
-                    </Tooltip>
-                  </Box>
-                  <Tooltip title="Practice verse">
-                    <Button
-                      size="small"
-                      variant="contained"
-                      color="secondary"
-                      startIcon={<SchoolIcon />}
-                      onClick={() => handlePracticeVerse(verse.id)}
+                <CardActions>
+                  <Tooltip title="Practice this verse">
+                    <IconButton 
+                      onClick={() => navigate(`/practice/${verse.id}`)}
+                      color="primary"
                     >
-                      Practice
-                    </Button>
+                      <SchoolIcon />
+                    </IconButton>
+                  </Tooltip>
+                  <Tooltip title="Edit verse">
+                    <IconButton
+                      onClick={() => navigate(`/edit-verse/${verse.id}`)}
+                      color="primary"
+                    >
+                      <EditIcon />
+                    </IconButton>
+                  </Tooltip>
+                  <Tooltip title="Delete verse">
+                    <IconButton
+                      onClick={() => {
+                        if (window.confirm('Are you sure you want to delete this verse?')) {
+                          handleDeleteVerse(verse.id);
+                        }
+                      }}
+                      color="error"
+                    >
+                      <DeleteIcon />
+                    </IconButton>
                   </Tooltip>
                 </CardActions>
               </Card>

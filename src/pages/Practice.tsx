@@ -1,213 +1,313 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import {
   Container,
-  Paper,
   Typography,
   TextField,
   Button,
   Box,
-  CircularProgress,
   Alert,
+  CircularProgress,
+  Paper,
   IconButton,
-  Card,
-  CardContent,
+  Tooltip,
 } from '@mui/material';
-import { Mic as MicIcon, Stop as StopIcon } from '@mui/icons-material';
+import {
+  Mic as MicIcon,
+  MicOff as MicOffIcon,
+} from '@mui/icons-material';
 import { useVerses } from '../hooks/useVerses';
-import type { Verse, PracticeAttempt } from '../types';
-import { db } from '../firebase/config';
-import { collection, addDoc } from 'firebase/firestore';
-import { useAuth } from '../contexts/AuthContext';
+import { useBrowserSpeechRecognition } from '../hooks/useBrowserSpeechRecognition';
+import type { Verse } from '../types';
 
 export default function Practice() {
-  const { verses, loading } = useVerses();
-  const [selectedVerse, setSelectedVerse] = useState<Verse | null>(null);
+  const navigate = useNavigate();
+  const { verseId } = useParams<{ verseId?: string }>();
+  const { verses, loading, error } = useVerses();
+  const [currentVerse, setCurrentVerse] = useState<Verse | null>(null);
   const [userInput, setUserInput] = useState('');
-  const [isRecording, setIsRecording] = useState(false);
-  const [recognition, setRecognition] = useState<SpeechRecognition | null>(null);
-  const [score, setScore] = useState<number | null>(null);
-  const [feedback, setFeedback] = useState<string[]>([]);
-  const { currentUser } = useAuth();
+  const [speechError, setSpeechError] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<{
+    message: string;
+    severity: 'success' | 'error';
+    details?: string;
+  } | null>(null);
 
-  useEffect(() => {
-    if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      const recognitionInstance = new SpeechRecognition();
-      recognitionInstance.continuous = true;
-      recognitionInstance.interimResults = true;
-
-      recognitionInstance.onresult = (event) => {
-        const transcript = Array.from(event.results)
-          .map(result => result[0].transcript)
-          .join('');
-        setUserInput(transcript);
-      };
-
-      recognitionInstance.onerror = (event) => {
-        console.error('Speech recognition error:', event.error);
-        setIsRecording(false);
-      };
-
-      setRecognition(recognitionInstance);
-    }
+  const handleSpeechResult = useCallback((text: string) => {
+    setUserInput(text);
   }, []);
 
-  const toggleRecording = () => {
-    if (!recognition) return;
+  const handleSpeechError = useCallback((error: string) => {
+    setSpeechError(error);
+  }, []);
 
-    if (isRecording) {
-      recognition.stop();
-    } else {
-      setUserInput('');
-      recognition.start();
-    }
-    setIsRecording(!isRecording);
-  };
+  const {
+    isListening,
+    startListening,
+    stopListening,
+    hasSupport,
+  } = useBrowserSpeechRecognition({
+    onResult: handleSpeechResult,
+    onError: handleSpeechError,
+  });
 
-  const calculateScore = (input: string, target: string): [number, string[]] => {
-    const inputWords = input.toLowerCase().trim().split(/\s+/);
-    const targetWords = target.toLowerCase().trim().split(/\s+/);
-    const mistakes: string[] = [];
-    let correctWords = 0;
-
-    inputWords.forEach((word, index) => {
-      if (index < targetWords.length) {
-        if (word === targetWords[index]) {
-          correctWords++;
+  // Set initial verse based on verseId or random selection
+  useEffect(() => {
+    if (!loading && verses.length > 0 && !currentVerse) {
+      if (verseId) {
+        const verse = verses.find(v => v.id === verseId);
+        if (verse) {
+          setCurrentVerse(verse);
         } else {
-          mistakes.push(`"${word}" should be "${targetWords[index]}"`);
+          // If verse not found, redirect to practice with random verse
+          navigate('/practice');
         }
+      } else {
+        const randomIndex = Math.floor(Math.random() * verses.length);
+        setCurrentVerse(verses[randomIndex]);
       }
-    });
+    }
+  }, [loading, verses.length, verseId, navigate]);
 
-    const score = Math.round((correctWords / targetWords.length) * 100);
-    return [score, mistakes];
+  const toggleListening = () => {
+    if (isListening) {
+      stopListening();
+    } else {
+      startListening();
+    }
   };
 
-  const handleSubmit = async () => {
-    if (!selectedVerse || !currentUser) return;
+  const checkVerse = (input: string, verse: Verse) => {
+    // Remove punctuation and convert to lowercase for comparison
+    const normalizeText = (text: string) =>
+      text.toLowerCase()
+        .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
 
-    const [calculatedScore, mistakes] = calculateScore(userInput, selectedVerse.text);
-    setScore(calculatedScore);
-    setFeedback(mistakes);
+    const normalizedInput = normalizeText(input);
+    const normalizedVerse = normalizeText(verse.text);
 
-    // Save attempt to Firestore
-    try {
-      const attempt: Omit<PracticeAttempt, 'id'> = {
-        userId: currentUser.uid,
-        verseId: selectedVerse.id,
-        inputText: userInput,
-        score: calculatedScore,
-        mistakes,
-        usedSpeechInput: isRecording,
-        timestamp: new Date(),
-      };
+    // Split into words for detailed comparison
+    const inputWords = normalizedInput.split(' ');
+    const verseWords = normalizedVerse.split(' ');
 
-      await addDoc(collection(db, 'attempts'), attempt);
-    } catch (error) {
-      console.error('Error saving attempt:', error);
+    // Find missing and extra words
+    const missingWords = verseWords.filter((word) => !inputWords.includes(word));
+    const extraWords = inputWords.filter((word) => !verseWords.includes(word));
+
+    // Calculate similarity
+    const correctWords = verseWords.filter((word) => inputWords.includes(word));
+    const similarity = correctWords.length / verseWords.length;
+
+    return {
+      isCorrect: similarity >= 0.8,
+      missingWords,
+      extraWords,
+      similarity: Math.round(similarity * 100),
+    };
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (currentVerse && userInput.trim()) {
+      const result = checkVerse(userInput, currentVerse);
+      if (result.isCorrect) {
+        setFeedback({
+          message: "Correct! Well done!",
+          severity: "success",
+          details: result.similarity === 100
+            ? "Perfect match!"
+            : `Accuracy: ${result.similarity}%`
+        });
+      } else {
+        let details = `Accuracy: ${result.similarity}%\n`;
+        if (result.missingWords.length > 0) {
+          details += `\nMissing words: "${result.missingWords.join('", "')}"`;
+        }
+        if (result.extraWords.length > 0) {
+          details += `\nExtra words: "${result.extraWords.join('", "')}"`;
+        }
+        details += `\n\nCorrect verse: "${currentVerse.text}"`;
+        
+        setFeedback({
+          message: "Not quite right. Try again!",
+          severity: "error",
+          details
+        });
+      }
     }
+  };
+
+  const handleNextVerse = () => {
+    setFeedback(null);
+    setUserInput('');
+    const newIndex = Math.floor(Math.random() * verses.length);
+    setCurrentVerse(verses[newIndex]);
   };
 
   if (loading) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
-        <CircularProgress />
-      </Box>
+      <Container>
+        <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
+          <CircularProgress />
+        </Box>
+      </Container>
+    );
+  }
+
+  if (error) {
+    return (
+      <Container>
+        <Box mt={4}>
+          <Alert severity="error">{error}</Alert>
+        </Box>
+      </Container>
+    );
+  }
+
+  if (!currentVerse) {
+    return (
+      <Container>
+        <Box mt={4}>
+          <Alert severity="info">
+            No verses available. Please add some verses first.
+          </Alert>
+          <Button
+            variant="contained"
+            onClick={() => navigate('/add')}
+            sx={{ mt: 2 }}
+          >
+            Add Verse
+          </Button>
+        </Box>
+      </Container>
     );
   }
 
   return (
     <Container maxWidth="md">
-      <Typography variant="h4" component="h1" gutterBottom align="center">
-        Practice Verses
-      </Typography>
+      <Paper elevation={3} sx={{ p: 4, mt: 4 }}>
+        <Typography variant="h4" component="h1" gutterBottom>
+          Practice
+        </Typography>
 
-      {!selectedVerse ? (
-        <Box sx={{ mt: 4 }}>
+        <Box sx={{ mb: 3 }}>
           <Typography variant="h6" gutterBottom>
-            Select a verse to practice:
+            {currentVerse.reference}
           </Typography>
-          {verses.map((verse) => (
-            <Card
-              key={verse.id}
-              sx={{ mb: 2, cursor: 'pointer' }}
-              onClick={() => setSelectedVerse(verse)}
-            >
-              <CardContent>
-                <Typography variant="h6">{verse.reference}</Typography>
-                <Typography color="text.secondary">{verse.translation}</Typography>
-              </CardContent>
-            </Card>
-          ))}
         </Box>
-      ) : (
-        <Paper sx={{ p: 3, mt: 4 }}>
-          <Typography variant="h6" gutterBottom>
-            {selectedVerse.reference} ({selectedVerse.translation})
-          </Typography>
-          
-          <Box sx={{ my: 3 }}>
+
+        {speechError && (
+          <Alert
+            severity="error"
+            onClose={() => setSpeechError(null)}
+            sx={{ mb: 2 }}
+          >
+            {speechError}
+          </Alert>
+        )}
+
+        {feedback && (
+          <Alert
+            severity={feedback.severity}
+            sx={{
+              mb: 2,
+              whiteSpace: 'pre-wrap',
+              '& .MuiAlert-message': {
+                width: '100%',
+              },
+            }}
+          >
+            <Typography variant="subtitle1" gutterBottom>
+              {feedback.message}
+            </Typography>
+            {feedback.details && (
+              <Typography variant="body2" component="div" sx={{ mt: 1 }}>
+                {feedback.details}
+              </Typography>
+            )}
+          </Alert>
+        )}
+
+        <Box component="form" onSubmit={handleSubmit} noValidate>
+          <Box sx={{ position: 'relative' }}>
             <TextField
+              margin="normal"
+              required
               fullWidth
+              name="practice"
+              label="Type or speak the verse from memory"
               multiline
               rows={4}
               value={userInput}
               onChange={(e) => setUserInput(e.target.value)}
-              placeholder="Type or speak the verse from memory..."
-              disabled={isRecording}
+              autoFocus
+              disabled={isListening}
             />
+            {hasSupport && (
+              <Box
+                sx={{
+                  position: 'absolute',
+                  right: 8,
+                  bottom: 8,
+                  bgcolor: 'background.paper',
+                  padding: '4px',
+                  borderRadius: '4px',
+                }}
+              >
+                <Tooltip title={isListening ? 'Stop speaking' : 'Start speaking'}>
+                  <IconButton
+                    onClick={toggleListening}
+                    color={isListening ? 'error' : 'primary'}
+                    sx={{
+                      animation: isListening ? 'pulse 1.5s infinite' : 'none',
+                      '@keyframes pulse': {
+                        '0%': {
+                          transform: 'scale(1)',
+                        },
+                        '50%': {
+                          transform: 'scale(1.1)',
+                        },
+                        '100%': {
+                          transform: 'scale(1)',
+                        },
+                      },
+                    }}
+                  >
+                    {isListening ? <MicOffIcon /> : <MicIcon />}
+                  </IconButton>
+                </Tooltip>
+              </Box>
+            )}
           </Box>
 
-          <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
+          <Box sx={{ mt: 3, display: 'flex', gap: 2 }}>
             <Button
+              type="submit"
               variant="contained"
-              onClick={handleSubmit}
               disabled={!userInput.trim()}
             >
               Check
             </Button>
-            <IconButton
-              color={isRecording ? 'secondary' : 'primary'}
-              onClick={toggleRecording}
-              disabled={!recognition}
-            >
-              {isRecording ? <StopIcon /> : <MicIcon />}
-            </IconButton>
+            {feedback?.severity === 'success' && (
+              <Button
+                variant="contained"
+                color="success"
+                onClick={handleNextVerse}
+              >
+                Next Verse
+              </Button>
+            )}
             <Button
               variant="outlined"
-              onClick={() => {
-                setSelectedVerse(null);
-                setUserInput('');
-                setScore(null);
-                setFeedback([]);
-              }}
+              onClick={() => navigate('/dashboard')}
             >
-              Choose Different Verse
+              Back to Dashboard
             </Button>
           </Box>
-
-          {score !== null && (
-            <Box sx={{ mt: 3 }}>
-              <Typography variant="h6" gutterBottom>
-                Score: {score}%
-              </Typography>
-              {feedback.length > 0 && (
-                <Alert severity="info" sx={{ mt: 2 }}>
-                  <Typography variant="subtitle1" gutterBottom>
-                    Corrections needed:
-                  </Typography>
-                  <ul>
-                    {feedback.map((mistake, index) => (
-                      <li key={index}>{mistake}</li>
-                    ))}
-                  </ul>
-                </Alert>
-              )}
-            </Box>
-          )}
-        </Paper>
-      )}
+        </Box>
+      </Paper>
     </Container>
   );
 }
