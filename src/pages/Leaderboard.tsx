@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import {
   Container,
   Typography,
-  Paper,
   Box,
   Alert,
   CircularProgress,
@@ -10,14 +9,12 @@ import {
   CardContent,
   Grid,
   Avatar,
-  Tooltip,
   Divider,
 } from '@mui/material';
 import {
   EmojiEvents as TrophyIcon,
   Whatshot as FireIcon,
   Stars as StarsIcon,
-  WorkspacePremium as PremiumIcon,
 } from '@mui/icons-material';
 import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase/config';
@@ -51,7 +48,7 @@ const getRankIcon = (rank: number) => {
     case 2:
       return <StarsIcon sx={{ fontSize: 40, color: '#C0C0C0' }} />;
     case 3:
-      return <PremiumIcon sx={{ fontSize: 40, color: '#CD7F32' }} />;
+      return <FireIcon sx={{ fontSize: 40, color: '#CD7F32' }} />;
     default:
       return <FireIcon sx={{ fontSize: 30, color: '#1976d2' }} />;
   }
@@ -147,7 +144,7 @@ export default function Leaderboard() {
               </Grid>
               <Grid item xs={12} md={4}>
                 <Box sx={{ p: 2, textAlign: 'center', borderRadius: 1 }}>
-                  <PremiumIcon sx={{ fontSize: 40, color: '#CD7F32', mb: 1 }} />
+                  <FireIcon sx={{ fontSize: 40, color: '#CD7F32', mb: 1 }} />
                   <Typography variant="h6">2 Points</Typography>
                   <Typography variant="body2" color="text.secondary">
                     Completed Recitation (below 80%)

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import {
   Container,
   Typography,
@@ -15,6 +15,8 @@ import {
 import {
   Mic as MicIcon,
   MicOff as MicOffIcon,
+  Stop as StopIcon,
+  EmojiEvents,
 } from '@mui/icons-material';
 import { useVerses } from '../hooks/useVerses';
 import { useBrowserSpeechRecognition } from '../hooks/useBrowserSpeechRecognition';
@@ -258,10 +260,28 @@ export default function Practice() {
   return (
     <Container maxWidth="md">
       <Paper elevation={3} sx={{ p: 4, mt: 4 }}>
-        <Typography variant="h4" component="h1" gutterBottom>
-          Practice
-        </Typography>
-
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+          <Typography variant="h4" component="h1" gutterBottom>
+            Practice Verses
+          </Typography>
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={<EmojiEvents />}
+            onClick={() => navigate('/leaderboard')}
+            sx={{ 
+              borderRadius: 2,
+              textTransform: 'none',
+              fontWeight: 'bold',
+              '&:hover': {
+                transform: 'translateY(-2px)',
+                transition: 'transform 0.2s'
+              }
+            }}
+          >
+            View Leaderboard
+          </Button>
+        </Box>
         <Box sx={{ mb: 3 }}>
           <Typography variant="h6" gutterBottom>
             {currentVerse.reference}
