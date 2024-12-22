@@ -1,68 +1,71 @@
 # Memory Assistant
 
-A feature-rich Memory App for Biblical Verse Memorization with speech recognition capabilities.
+A web application to help users memorize and practice Bible verses using modern speech recognition technology.
 
 ## Features
 
-- User Authentication (Firebase)
-- Passage Storage and Management
-- Grading System with Real-time Feedback
-- Progress Tracking and Visualization
-- Anonymous Leaderboard
-- Speech Recognition for Verse Input
+- User Authentication
+- Verse Management (Add, Edit, Delete)
+- Practice Mode with Speech Recognition
+- Real-time scoring and feedback
+- Word-by-word comparison
+- Support for both typing and speaking
+- Cross-browser compatibility (Chrome, Firefox)
 
-## Tech Stack
+## Technology Stack
 
-- Frontend: React + TypeScript
-- Backend: Firebase (Authentication, Firestore)
-- UI Framework: Material-UI
-- Charts: Chart.js with react-chartjs-2
-- Routing: React Router
-- HTTP Client: Axios
+- React with TypeScript
+- Material-UI for styling
+- Firebase (Authentication, Firestore)
+- Vite for build tooling
+- Web Speech API for voice recognition
 
-## Getting Started
+## Setup
 
-1. Install dependencies:
-   ```bash
-   npm install
-   ```
-
-2. Start the development server:
-   ```bash
-   npm run dev
-   ```
-
-3. Build for production:
-   ```bash
-   npm run build
-   ```
-
-## Project Structure
-
-```
-src/
-├── components/     # React components
-├── contexts/       # React contexts
-├── firebase/       # Firebase configuration
-├── hooks/         # Custom hooks
-├── pages/         # Page components
-├── types/         # TypeScript types
-└── utils/         # Utility functions
+1. Clone the repository:
+```bash
+git clone [your-repo-url]
+cd Memory_Assistant
 ```
 
-## Environment Variables
-
-Create a `.env` file in the root directory with your Firebase configuration:
-
+2. Install dependencies:
+```bash
+npm install
 ```
-VITE_FIREBASE_API_KEY=your_api_key
-VITE_FIREBASE_AUTH_DOMAIN=your_auth_domain
-VITE_FIREBASE_PROJECT_ID=your_project_id
-VITE_FIREBASE_STORAGE_BUCKET=your_storage_bucket
-VITE_FIREBASE_MESSAGING_SENDER_ID=your_messaging_sender_id
-VITE_FIREBASE_APP_ID=your_app_id
+
+3. Set up environment variables:
+   - Copy `.env.example` to `.env.local`
+   - Fill in your Firebase credentials in `.env.local`
+
+4. Start the development server:
+```bash
+npm run dev
 ```
+
+## Firebase Setup
+
+1. Create a new Firebase project
+2. Enable Authentication and Firestore
+3. Add your Firebase configuration to `.env.local`
+4. Deploy Firestore security rules and indexes:
+```bash
+firebase deploy --only firestore:rules,firestore:indexes
+```
+
+## Available Scripts
+
+- `npm run dev` - Start development server
+- `npm run build` - Build for production
+- `npm run preview` - Preview production build
+
+## Contributing
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
 
 ## License
 
-MIT
+This project is licensed under the MIT License - see the LICENSE file for details.
