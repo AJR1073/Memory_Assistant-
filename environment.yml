@@ -1,0 +1,10 @@
+name: memory-assistant
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - nodejs>=18
+  - pip
+  - pip:
+    - python-dotenv==1.0.0
