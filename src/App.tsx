@@ -1,29 +1,72 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { AuthProvider } from './contexts/AuthContext';
-import Register from './pages/Register';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { ThemeProvider } from '@mui/material/styles';
+import CssBaseline from '@mui/material/CssBaseline';
+import theme from './theme';
+import Navigation from './components/Navigation';
+import Home from './pages/Home';
 import Login from './pages/Login';
+import Register from './pages/Register';
+import Practice from './pages/Practice';
+import PracticeVerse from './pages/PracticeVerse';
+import Leaderboard from './pages/Leaderboard';
 import Dashboard from './pages/Dashboard';
 import AddVerse from './pages/AddVerse';
-import Practice from './pages/Practice';
-import Leaderboard from './pages/Leaderboard';
-import Home from './pages/Home';
-import PrivateRoute from './components/PrivateRoute';
-import Navigation from './components/Navigation';
 import EditVerse from './pages/EditVerse';
-import PracticeVerse from './pages/PracticeVerse';
-import { ThemeProvider, createTheme } from '@mui/material';
-import CssBaseline from '@mui/material/CssBaseline';
+import { AuthProvider } from './contexts/AuthContext';
+import { useModules } from './hooks/useModules';
+import PrivateRoute from './components/PrivateRoute';
 
-const theme = createTheme({
-  palette: {
-    primary: {
-      main: '#1976d2',
-    },
-    secondary: {
-      main: '#dc004e',
-    },
-  },
-});
+function AppRoutes() {
+  const { hasModuleAccess } = useModules();
+
+  return (
+    <Routes>
+      <Route path="/" element={<Home />} />
+      <Route path="/register" element={<Register />} />
+      <Route path="/login" element={<Login />} />
+      
+      {/* Protected Routes */}
+      <Route path="/dashboard" element={
+        <PrivateRoute>
+          <Dashboard />
+        </PrivateRoute>
+      } />
+      <Route path="/add-verse" element={
+        <PrivateRoute>
+          <AddVerse />
+        </PrivateRoute>
+      } />
+      <Route path="/edit-verse/:verseId" element={
+        <PrivateRoute>
+          <EditVerse />
+        </PrivateRoute>
+      } />
+      <Route path="/practice" element={
+        <PrivateRoute>
+          <Practice />
+        </PrivateRoute>
+      } />
+      <Route path="/practice/:verseId" element={
+        <PrivateRoute>
+          <Practice />
+        </PrivateRoute>
+      } />
+      <Route path="/practice-verse/:verseId" element={
+        <PrivateRoute>
+          <PracticeVerse />
+        </PrivateRoute>
+      } />
+      <Route path="/leaderboard" element={
+        <PrivateRoute>
+          <Leaderboard />
+        </PrivateRoute>
+      } />
+
+      {/* Catch all route */}
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+}
 
 function App() {
   return (
@@ -32,67 +75,7 @@ function App() {
       <Router>
         <AuthProvider>
           <Navigation />
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/register" element={<Register />} />
-            <Route path="/login" element={<Login />} />
-            <Route
-              path="/dashboard"
-              element={
-                <PrivateRoute>
-                  <Dashboard />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/add-verse"
-              element={
-                <PrivateRoute>
-                  <AddVerse />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/edit-verse/:verseId"
-              element={
-                <PrivateRoute>
-                  <EditVerse />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/practice"
-              element={
-                <PrivateRoute>
-                  <Practice />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/practice/:verseId"
-              element={
-                <PrivateRoute>
-                  <Practice />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/practice-verse/:verseId"
-              element={
-                <PrivateRoute>
-                  <PracticeVerse />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/leaderboard"
-              element={
-                <PrivateRoute>
-                  <Leaderboard />
-                </PrivateRoute>
-              }
-            />
-          </Routes>
+          <AppRoutes />
         </AuthProvider>
       </Router>
     </ThemeProvider>

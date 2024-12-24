@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import {
   collection,
   query,
-  where,
   orderBy,
   onSnapshot,
   addDoc,
@@ -42,7 +41,6 @@ export function useVerses() {
       const versesRef = collection(db, 'verses');
       const versesQuery = query(
         versesRef,
-        where('userId', '==', currentUser.uid),
         orderBy('createdAt', 'desc')
       );
 
@@ -54,7 +52,6 @@ export function useVerses() {
             ...doc.data(),
             createdAt: doc.data().createdAt?.toDate() || new Date(),
           })) as Verse[];
-          
           setVerses(versesData);
           setLoading(false);
           setError(null);

@@ -1,21 +1,20 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import {
   Container,
   Typography,
-  TextField,
-  Button,
   Box,
-  Alert,
-  CircularProgress,
+  Button,
   Paper,
   IconButton,
   Tooltip,
+  TextField,
+  Alert,
+  CircularProgress,
 } from '@mui/material';
 import {
   Mic as MicIcon,
   MicOff as MicOffIcon,
-  Stop as StopIcon,
   EmojiEvents,
 } from '@mui/icons-material';
 import { useVerses } from '../hooks/useVerses';

@@ -1,0 +1,40 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Allow users to read and write their own data
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Allow authenticated users to read all verses
+    match /verses/{verseId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == resource.data.userId;
+    }
+
+    // Allow users to read and write their own practice sessions
+    match /practiceSessions/{sessionId} {
+      allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
+    }
+
+    // Allow users to read and write their own module settings
+    match /userModules/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Allow users to read and write their own scripts
+    match /scripts/{scriptId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && (
+        !resource.data.exists || request.auth.uid == resource.data.createdBy
+      );
+    }
+
+    // Allow users to read the leaderboard
+    match /leaderboard/{entry} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == request.resource.data.userId;
+    }
+  }
+}
