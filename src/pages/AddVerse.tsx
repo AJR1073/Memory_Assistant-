@@ -32,11 +32,9 @@ export default function AddVerse() {
   const [verse, setVerse] = useState('');
   const [text, setText] = useState('');
   const [translation, setTranslation] = useState('');
-  const [tags, setTags] = useState<string[]>([]);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [hasChanges, setHasChanges] = useState(false);
+  const [shareToPublic, setShareToPublic] = useState(false);
 
   // Initialize database with default data
   useEffect(() => {
@@ -53,21 +51,8 @@ export default function AddVerse() {
     }
   }, [translations, translation]);
 
-  // Track form changes
-  useEffect(() => {
-    if (book || chapter || verse || text || tags.length > 0) {
-      setHasChanges(true);
-    }
-  }, [book, chapter, verse, text, tags]);
-
   const handleCancel = () => {
-    if (hasChanges) {
-      if (window.confirm('You have unsaved changes. Are you sure you want to leave?')) {
-        navigate('/verses');
-      }
-    } else {
-      navigate('/verses');
-    }
+    navigate('/verses');
   };
 
   const validateForm = () => {
@@ -91,11 +76,17 @@ export default function AddVerse() {
       return false;
     }
 
+    if (!book) {
+      setError('Book is required');
+      return false;
+    }
+
     return true;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    
     if (!currentUser) {
       setError('You must be logged in to add verses');
       return;
@@ -105,53 +96,35 @@ export default function AddVerse() {
       return;
     }
 
-    try {
-      setIsSubmitting(true);
-      setError('');
-      
-      // Generate reference based on available fields
-      let reference = '';
-      if (book) {
-        reference += book;
-        if (chapter) {
-          reference += ` ${chapter}`;
-          if (verse) {
-            reference += `:${verse}`;
-          }
-        }
-      }
+    setIsSubmitting(true);
+    setError('');
 
+    try {
       const verseData = {
-        book: book || null,
-        chapter: chapter ? parseInt(chapter) : null,
-        verse: verse ? parseInt(verse) : null,
-        text: text.trim(),
+        reference: book + (chapter ? ` ${chapter}` : '') + (verse ? `:${verse}` : ''),
+        text,
         translation,
-        reference: reference || 'Custom Verse',
         userId: currentUser.uid,
-        createdBy: currentUser.uid,
         createdAt: new Date(),
-        tags
       };
 
+      // Add to user's verses
       await addDoc(collection(db, 'verses'), verseData);
-      setSuccess(true);
-      setHasChanges(false);
-      
-      // Clear form
-      setBook('');
-      setChapter('');
-      setVerse('');
-      setText('');
-      setTags([]);
-      
-      // Navigate after a short delay
-      setTimeout(() => {
-        navigate('/verses');
-      }, 2000);
+
+      // Add to public library if shared
+      if (shareToPublic) {
+        await addDoc(collection(db, 'publicLibrary'), {
+          ...verseData,
+          contributedBy: currentUser.uid,
+          contributorName: currentUser.displayName || 'Anonymous User',
+          likedBy: [],
+        });
+      }
+
+      navigate('/verses');
     } catch (err) {
-      setError('Failed to add verse. Please try again.');
       console.error('Error adding verse:', err);
+      setError('Failed to add verse. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -181,33 +154,20 @@ export default function AddVerse() {
             </Alert>
           )}
 
-          {success && (
-            <Alert severity="success" sx={{ mb: 2 }}>
-              Verse added successfully! Redirecting...
-            </Alert>
-          )}
-
           <Box sx={{ mb: 2 }}>
             <Autocomplete
               options={books.map(b => b.name)}
               value={book}
-              onChange={(_, newValue) => setBook(newValue || '')}
+              onChange={(_, value) => setBook(value || '')}
               renderInput={(params) => (
                 <TextField
                   {...params}
-                  label="Book (optional)"
-                  fullWidth
+                  label="Book"
+                  required
+                  error={!!error && !book}
+                  helperText={error && !book ? 'Book is required' : ''}
                 />
               )}
-              renderOption={(props, option, state) => (
-                <li {...props} key={option}>
-                  <Typography variant="body1">{option}</Typography>
-                  <Typography variant="caption" color="textSecondary" sx={{ ml: 1 }}>
-                    {books.find(b => b.name === option)?.description}
-                  </Typography>
-                </li>
-              )}
-              isOptionEqualToValue={(option, value) => option === value || (!option && !value)}
             />
           </Box>
 
@@ -278,17 +238,30 @@ export default function AddVerse() {
               multiple
               freeSolo
               options={[]}
-              value={tags}
-              onChange={(_, newValue) => setTags(newValue)}
+              value={[]}
+              onChange={() => {}}
               renderInput={(params) => (
                 <TextField
                   {...params}
-                  label="Tags"
+                  label="Tags (optional)"
                   placeholder="Add tags"
-                  helperText="Press enter to add tags"
                 />
               )}
             />
+          </Box>
+
+          <Box sx={{ mb: 2 }}>
+            <FormControl fullWidth>
+              <InputLabel>Share to Public Library</InputLabel>
+              <Select
+                value={shareToPublic}
+                label="Share to Public Library"
+                onChange={(e) => setShareToPublic(e.target.value === 'true')}
+              >
+                <MenuItem value="true">Yes</MenuItem>
+                <MenuItem value="false">No</MenuItem>
+              </Select>
+            </FormControl>
           </Box>
 
           <Box sx={{ mt: 3, display: 'flex', gap: 2 }}>
@@ -296,7 +269,7 @@ export default function AddVerse() {
               type="submit"
               variant="contained"
               color="primary"
-              disabled={success || isSubmitting}
+              disabled={isSubmitting}
             >
               {isSubmitting ? (
                 <>

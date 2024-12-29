@@ -1,80 +1,75 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   Container,
   Typography,
   Box,
-  Button,
-  Grid,
+  CircularProgress,
+  Alert,
   Card,
   CardContent,
   CardActions,
   IconButton,
-  Alert,
-  CircularProgress,
-  Tooltip,
+  Button,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
+  Tooltip,
 } from '@mui/material';
 import {
-  Add as AddIcon,
-  Edit as EditIcon,
   Delete as DeleteIcon,
-  CalendarToday as CalendarIcon,
   Share as ShareIcon,
+  PlayArrow as PlayIcon,
 } from '@mui/icons-material';
+import { Link } from 'react-router-dom';
 import { useVerses } from '../hooks/useVerses';
-import { usePublicLibrary } from '../hooks/usePublicLibrary';
 import { useAuth } from '../contexts/AuthContext';
-import { doc, deleteDoc } from 'firebase/firestore';
+import { doc, deleteDoc, addDoc, collection } from 'firebase/firestore';
 import { db } from '../firebase/config';
 
 export default function Verses() {
-  const [deleteError, setDeleteError] = useState<string | null>(null);
-  const [shareError, setShareError] = useState<string | null>(null);
   const [selectedVerse, setSelectedVerse] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [shareError, setShareError] = useState<string | null>(null);
   const { verses, loading } = useVerses();
-  const { addToPublicLibrary } = usePublicLibrary();
   const { currentUser } = useAuth();
-  const navigate = useNavigate();
 
-  const handleDelete = async (verseId: string) => {
-    if (!currentUser) return;
+  const handleDelete = async () => {
+    if (!selectedVerse) return;
 
     try {
-      await deleteDoc(doc(db, 'verses', verseId));
+      const verseRef = doc(db, 'verses', selectedVerse);
+      await deleteDoc(verseRef);
       setDeleteDialogOpen(false);
       setSelectedVerse(null);
-      setDeleteError(null);
-    } catch (error) {
-      console.error('Error deleting verse:', error);
+      window.location.reload();
+    } catch (err) {
+      console.error('Error deleting verse:', err);
       setDeleteError('Failed to delete verse');
     }
   };
 
-  const handleShare = async () => {
-    if (!selectedVerse) return;
+  const handleShareToPublic = async (verseId: string) => {
+    const verse = verses.find(v => v.id === verseId);
+    if (!verse || !currentUser) return;
 
     try {
-      const verse = verses.find(v => v.id === selectedVerse);
-      if (!verse) return;
-
-      await addToPublicLibrary({
-        reference: verse.reference,
-        text: verse.text,
-        translation: verse.translation,
+      await addDoc(collection(db, 'publicLibrary'), {
+        ...verse,
+        contributedBy: currentUser.uid,
+        contributorName: currentUser.displayName || 'Anonymous User',
+        likedBy: [],
       });
 
       setShareDialogOpen(false);
       setSelectedVerse(null);
-      setShareError(null);
-    } catch (error) {
-      console.error('Error sharing verse:', error);
-      setShareError('Failed to share verse');
+      window.location.reload();
+    } catch (err) {
+      console.error('Error sharing verse:', err);
+      setShareError('Failed to share verse to public library');
     }
   };
 
@@ -95,174 +90,138 @@ export default function Verses() {
           <Typography variant="h4" component="h1">
             My Verses
           </Typography>
-          <Box sx={{ display: 'flex', gap: 2 }}>
-            <Button
-              variant="contained"
-              color="primary"
-              startIcon={<AddIcon />}
-              onClick={() => navigate('/verses/add')}
-            >
-              Add New Verse
-            </Button>
-            <Button
-              variant="outlined"
-              onClick={() => navigate('/public-library')}
-            >
-              Public Library
-            </Button>
-          </Box>
+          <Button
+            component={Link}
+            to="/verses/add"
+            variant="contained"
+            color="primary"
+          >
+            Add Verse
+          </Button>
         </Box>
 
-        {(deleteError || shareError) && (
+        {(deleteError || shareError || error) && (
           <Alert severity="error" sx={{ mb: 2 }} onClose={() => {
             setDeleteError(null);
             setShareError(null);
+            setError(null);
           }}>
-            {deleteError || shareError}
+            {deleteError || shareError || error}
           </Alert>
         )}
 
-        <Grid container spacing={3}>
-          {verses.map((verse) => (
-            <Grid item xs={12} sm={6} md={4} key={verse.id}>
-              <Card>
-                <CardContent>
-                  <Typography variant="h6" gutterBottom>
-                    {verse.reference}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" gutterBottom>
-                    {verse.translation}
-                  </Typography>
-                  <Typography
-                    variant="body1"
-                    sx={{
-                      display: '-webkit-box',
-                      WebkitLineClamp: 3,
-                      WebkitBoxOrient: 'vertical',
-                      overflow: 'hidden',
-                      mb: 1,
-                    }}
-                  >
-                    {verse.text}
-                  </Typography>
-                </CardContent>
-                <CardActions>
-                  <Button
-                    size="small"
-                    onClick={() => navigate(`/practice/${verse.id}`)}
-                  >
-                    Practice
-                  </Button>
-                  <Tooltip title="Edit Verse">
-                    <IconButton
-                      size="small"
-                      onClick={() => navigate(`/verses/edit/${verse.id}`)}
-                    >
-                      <EditIcon />
-                    </IconButton>
-                  </Tooltip>
-                  <Tooltip title="Share to Public Library">
-                    <IconButton
-                      size="small"
-                      onClick={() => {
-                        setSelectedVerse(verse.id);
-                        setShareDialogOpen(true);
-                      }}
-                    >
-                      <ShareIcon />
-                    </IconButton>
-                  </Tooltip>
-                  <Tooltip title="Delete Verse">
-                    <IconButton
-                      size="small"
-                      onClick={() => {
-                        setSelectedVerse(verse.id);
-                        setDeleteDialogOpen(true);
-                      }}
-                    >
-                      <DeleteIcon />
-                    </IconButton>
-                  </Tooltip>
-                  <Tooltip title="Schedule Practice">
-                    <IconButton
-                      size="small"
-                      onClick={() => navigate(`/schedule/${verse.id}`)}
-                    >
-                      <CalendarIcon />
-                    </IconButton>
-                  </Tooltip>
-                </CardActions>
-              </Card>
-            </Grid>
-          ))}
-        </Grid>
-
-        {verses.length === 0 && (
-          <Box
-            sx={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: 2,
-              mt: 4,
-            }}
-          >
+        {verses.length === 0 ? (
+          <Box sx={{ textAlign: 'center', mt: 4 }}>
             <Typography variant="h6" color="text.secondary">
-              No verses added yet
+              You haven't added any verses yet
             </Typography>
             <Button
+              component={Link}
+              to="/verses/add"
               variant="contained"
-              startIcon={<AddIcon />}
-              onClick={() => navigate('/verses/add')}
+              color="primary"
+              sx={{ mt: 2 }}
             >
               Add Your First Verse
             </Button>
           </Box>
+        ) : (
+          verses.map(verse => (
+            <Card key={verse.id} sx={{ mb: 2 }}>
+              <CardContent>
+                <Typography variant="h6" gutterBottom>
+                  {verse.reference}
+                </Typography>
+                <Typography variant="body2" color="text.secondary" gutterBottom>
+                  {verse.translation}
+                </Typography>
+                <Typography variant="body1">
+                  {verse.text}
+                </Typography>
+              </CardContent>
+              <CardActions>
+                <Button
+                  component={Link}
+                  to={`/practice/${verse.id}`}
+                  size="small"
+                  startIcon={<PlayIcon />}
+                >
+                  Practice
+                </Button>
+                <Box sx={{ flexGrow: 1 }} />
+                <Tooltip title="Share to Public Library">
+                  <IconButton
+                    onClick={() => {
+                      setSelectedVerse(verse.id);
+                      setShareDialogOpen(true);
+                    }}
+                  >
+                    <ShareIcon />
+                  </IconButton>
+                </Tooltip>
+                <Tooltip title="Delete Verse">
+                  <IconButton
+                    onClick={() => {
+                      setSelectedVerse(verse.id);
+                      setDeleteDialogOpen(true);
+                    }}
+                    color="error"
+                  >
+                    <DeleteIcon />
+                  </IconButton>
+                </Tooltip>
+              </CardActions>
+            </Card>
+          ))
         )}
-
-        <Dialog
-          open={deleteDialogOpen}
-          onClose={() => setDeleteDialogOpen(false)}
-        >
-          <DialogTitle>Delete Verse</DialogTitle>
-          <DialogContent>
-            <Typography>
-              Are you sure you want to delete this verse? This action cannot be undone.
-            </Typography>
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
-            <Button
-              onClick={() => selectedVerse && handleDelete(selectedVerse)}
-              color="error"
-            >
-              Delete
-            </Button>
-          </DialogActions>
-        </Dialog>
-
-        <Dialog
-          open={shareDialogOpen}
-          onClose={() => setShareDialogOpen(false)}
-        >
-          <DialogTitle>Share to Public Library</DialogTitle>
-          <DialogContent>
-            <Typography>
-              Are you sure you want to share this verse to the public library? Other users will be able to view and practice with this verse.
-            </Typography>
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setShareDialogOpen(false)}>Cancel</Button>
-            <Button
-              onClick={handleShare}
-              color="primary"
-              variant="contained"
-            >
-              Share
-            </Button>
-          </DialogActions>
-        </Dialog>
       </Box>
+
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+      >
+        <DialogTitle>
+          Delete Verse
+        </DialogTitle>
+        <DialogContent>
+          <Typography>
+            Are you sure you want to delete this verse? This action cannot be undone.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
+          <Button
+            onClick={handleDelete}
+            color="error"
+          >
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={shareDialogOpen}
+        onClose={() => setShareDialogOpen(false)}
+      >
+        <DialogTitle>
+          Share to Public Library
+        </DialogTitle>
+        <DialogContent>
+          <Typography>
+            Share this verse to the public library? Other users will be able to see and practice it.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShareDialogOpen(false)}>Cancel</Button>
+          <Button
+            onClick={() => selectedVerse && handleShareToPublic(selectedVerse)}
+            color="primary"
+            variant="contained"
+          >
+            Share
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 }

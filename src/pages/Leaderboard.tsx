@@ -48,17 +48,23 @@ export default function Leaderboard() {
   const calculateProgress = (score: number) => (score % POINTS_PER_LEVEL) / POINTS_PER_LEVEL * 100;
 
   const getPositionStyle = (index: number) => {
+    type ColorStyle = {
+      border: string;
+      bgcolor: string;
+    };
+
     const baseStyle = {
-      p: 2,
-      mb: 2,
       display: 'flex',
       alignItems: 'center',
       gap: 2,
+      mb: 2,
       borderRadius: 2,
       position: 'relative' as const,
-    };
+    } as const;
 
-    const colors = {
+    if (index >= 3) return baseStyle;
+
+    const colors: Record<number, ColorStyle> = {
       0: { border: '2px solid #FFD700', bgcolor: 'rgba(255, 215, 0, 0.1)' },
       1: { border: '2px solid #C0C0C0', bgcolor: 'rgba(192, 192, 192, 0.1)' },
       2: { border: '2px solid #CD7F32', bgcolor: 'rgba(205, 127, 50, 0.1)' },
@@ -66,7 +72,8 @@ export default function Leaderboard() {
 
     return {
       ...baseStyle,
-      ...(index < 3 ? colors[index] : {}),
+      border: colors[index].border,
+      bgcolor: colors[index].bgcolor,
     };
   };
 

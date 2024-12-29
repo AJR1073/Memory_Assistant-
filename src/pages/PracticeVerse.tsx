@@ -22,12 +22,7 @@ import {
   Visibility as VisibilityIcon,
   VisibilityOff as VisibilityOffIcon,
 } from '@mui/icons-material';
-import {
-  doc,
-  getDoc,
-  updateDoc,
-  increment
-} from 'firebase/firestore';
+import { doc, getDoc, updateDoc, increment } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -38,67 +33,69 @@ interface Verse {
   translation: string;
 }
 
-interface SpeechSynthesis {
-  speak: (text: string) => void;
-  speaking: boolean;
-  cancel: () => void;
-}
-
-interface SpeechRecognition {
-  startListening: () => Promise<void>;
-  stopListening: () => Promise<void>;
-}
-
 interface WordComparison {
   word: string;
   status: 'correct' | 'incorrect' | 'missing';
   expected?: string;
 }
 
-// Real speech synthesis implementation
-const useSpeechSynthesis = () => {
-  const synth = window.speechSynthesis;
+interface SpeechRecognitionResult {
+  transcript: string;
+  isFinal: boolean;
+}
 
-  return {
-    speak: (text: string) => {
-      const utterance = new SpeechSynthesisUtterance(text);
-      synth.speak(utterance);
-    },
-    speaking: synth.speaking,
-    cancel: () => synth.cancel(),
-  };
-};
+interface SpeechRecognitionEvent {
+  results: SpeechRecognitionResult[][];
+}
 
 // Real speech recognition implementation
 const useSpeechRecognition = ({ onResult }: { onResult: (text: string) => void }) => {
-  const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-  
-  recognition.continuous = true;
-  recognition.interimResults = true;
-  
-  recognition.onresult = (event) => {
-    const transcript = Array.from(event.results)
-      .map(result => result[0].transcript)
-      .join(' ');
-    onResult(transcript);
+  const [isListening, setIsListening] = useState(false);
+
+  const startListening = async () => {
+    try {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const recognition = new SpeechRecognition();
+
+      recognition.continuous = true;
+      recognition.interimResults = true;
+
+      recognition.onresult = (event: SpeechRecognitionEvent) => {
+        const result = event.results[event.results.length - 1][0];
+        if (result.isFinal) {
+          onResult(result.transcript);
+        }
+      };
+
+      recognition.start();
+      setIsListening(true);
+    } catch (error) {
+      console.error('Speech recognition error:', error);
+    }
   };
 
-  return {
-    startListening: async () => {
-      try {
-        await recognition.start();
-      } catch (error) {
-        console.error('Speech recognition error:', error);
-      }
-    },
-    stopListening: async () => {
-      try {
-        recognition.stop();
-      } catch (error) {
-        console.error('Error stopping speech recognition:', error);
-      }
-    },
+  const stopListening = async () => {
+    setIsListening(false);
   };
+
+  return { startListening, stopListening, isListening };
+};
+
+// Real speech synthesis implementation
+const useSpeechSynthesis = () => {
+  const synth = window.speechSynthesis;
+  const [speaking, setSpeaking] = useState(false);
+
+  const speak = (text: string) => {
+    if (speaking) return;
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.onend = () => setSpeaking(false);
+    setSpeaking(true);
+    synth.speak(utterance);
+  };
+
+  return { speak, speaking };
 };
 
 // Add TypeScript declarations for the Web Speech API
@@ -106,28 +103,24 @@ declare global {
   interface Window {
     SpeechRecognition: any;
     webkitSpeechRecognition: any;
-    speechSynthesis: SpeechSynthesis;
   }
 }
 
 export default function PracticeVerse() {
-  const { verseId } = useParams<{ verseId: string }>();
+  const { verseId } = useParams();
   const { currentUser } = useAuth();
   const [verse, setVerse] = useState<Verse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isListening, setIsListening] = useState(false);
-  const [spokenText, setSpokenText] = useState('');
   const [typedText, setTypedText] = useState('');
   const [accuracy, setAccuracy] = useState<number | null>(null);
   const [showTypedAccuracy, setShowTypedAccuracy] = useState<number | null>(null);
   const [comparisonResult, setComparisonResult] = useState<WordComparison[]>([]);
   const [showVerse, setShowVerse] = useState(false);
-  const { speak, speaking, cancel } = useSpeechSynthesis();
-  const { startListening, stopListening } = useSpeechRecognition({
+  const { speak, speaking } = useSpeechSynthesis();
+  const { startListening, stopListening, isListening } = useSpeechRecognition({
     onResult: (text: string) => {
       const cleanText = text.trim();
-      setSpokenText(cleanText);
       setTypedText(cleanText);
       if (verse) {
         const { accuracy: score, comparison } = compareTexts(cleanText, verse.text);
@@ -301,8 +294,6 @@ export default function PracticeVerse() {
   }, [verseId]);
 
   const handleStartListening = async () => {
-    setIsListening(true);
-    setSpokenText('');
     setTypedText('');
     setAccuracy(null);
     setShowTypedAccuracy(null);
@@ -310,7 +301,6 @@ export default function PracticeVerse() {
   };
 
   const handleStopListening = async () => {
-    setIsListening(false);
     await stopListening();
   };
 
