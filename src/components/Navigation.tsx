@@ -16,9 +16,12 @@ import {
 } from '@mui/material';
 import {
   Menu as MenuIcon,
-  MenuBook,
-  TheaterComedy,
+  Dashboard as DashboardIcon,
+  LibraryBooks as LibraryIcon,
+  EmojiEvents as TrophyIcon,
+  Add as AddIcon,
   Settings as SettingsIcon,
+  CalendarMonth as CalendarIcon,
   Translate as TranslateIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
@@ -57,19 +60,19 @@ function Navigation() {
   };
 
   const menuItems = [
-    { text: 'Dashboard', icon: <MenuBook />, path: '/dashboard' },
-    { text: 'Practice', icon: <MenuBook />, path: '/practice' },
-    { text: 'Add Verse', icon: <MenuBook />, path: '/add-verse' },
-    { text: 'Translations', icon: <TranslateIcon />, path: '/translations' },
-    { text: 'Leaderboard', icon: <MenuBook />, path: '/leaderboard' },
-    { text: 'Settings', icon: <SettingsIcon />, path: '/settings' },
+    { text: 'Dashboard', path: '/dashboard', icon: <DashboardIcon /> },
+    { text: 'Verses', path: '/verses', icon: <LibraryIcon /> },
+    { text: 'Add Verse', path: '/add-verse', icon: <AddIcon /> },
+    { text: 'Rehearsals', path: '/rehearsals', icon: <CalendarIcon /> },
+    { text: 'Leaderboard', path: '/leaderboard', icon: <TrophyIcon /> },
+    { text: 'Settings', path: '/settings', icon: <SettingsIcon /> },
   ];
 
   return (
     <AppBar position="static">
       <Container maxWidth="xl">
         <Toolbar disableGutters>
-          <MenuBook sx={{ display: { xs: 'none', md: 'flex' }, mr: 1 }} />
+          <DashboardIcon sx={{ display: { xs: 'none', md: 'flex' }, mr: 1 }} />
           <Typography
             variant="h6"
             noWrap
@@ -141,7 +144,7 @@ function Navigation() {
             </Menu>
           </Box>
 
-          <MenuBook sx={{ display: { xs: 'flex', md: 'none' }, mr: 1 }} />
+          <DashboardIcon sx={{ display: { xs: 'flex', md: 'none' }, mr: 1 }} />
           <Typography
             variant="h5"
             noWrap

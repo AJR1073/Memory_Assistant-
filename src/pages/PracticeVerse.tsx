@@ -24,6 +24,7 @@ import { useTranslations } from '../hooks/useTranslations';
 import { useBrowserSpeechRecognition } from '../hooks/useBrowserSpeechRecognition';
 import { useAuth } from '../contexts/AuthContext';
 import { useLeaderboard } from '../hooks/useLeaderboard';
+import { useRehearsal } from '../hooks/useRehearsal';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { compareTexts, generateHighlightedText } from '../utils/textComparison';
@@ -36,6 +37,7 @@ export default function PracticeVerse() {
   const { translations } = useTranslations();
   const { currentUser } = useAuth();
   const { updateUserScore } = useLeaderboard();
+  const { scheduleRehearsal, completeRehearsal } = useRehearsal();
   
   const [userInput, setUserInput] = useState('');
   const [score, setScore] = useState(0);
@@ -110,6 +112,10 @@ export default function PracticeVerse() {
 
         // Update user's score in leaderboard
         await updateUserScore(newCount * 100, newCount);
+
+        // Schedule next rehearsal
+        await scheduleRehearsal(verseId, verse.reference);
+
       } catch (error) {
         console.error('Error updating practice stats:', error);
       }
