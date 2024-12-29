@@ -150,112 +150,143 @@ export default function RehearsalSchedule() {
 
   return (
     <Container maxWidth="md">
-      <Paper elevation={3} sx={{ mt: 4, p: 3 }}>
-        <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-          <Typography variant="h4" component="h1" gutterBottom sx={{ mb: 3 }}>
-            <CalendarIcon sx={{ mr: 1, verticalAlign: 'bottom' }} />
-            Rehearsal Schedule
+      <Box sx={{ py: 4 }}>
+        <Typography variant="h4" component="h1" gutterBottom>
+          Rehearsal Schedule
+        </Typography>
+
+        <Paper sx={{ p: 3, mb: 3 }}>
+          <Typography variant="h6" gutterBottom color="primary">
+            How to Get Started
           </Typography>
-          
-          <Tabs value={selectedTab} onChange={handleTabChange} aria-label="rehearsal tabs">
-            <Tab 
-              icon={<TodayIcon />} 
-              label={`Today (${todayRehearsals.length})`}
-              iconPosition="start"
-              sx={{ minHeight: 'auto' }}
-            />
-            <Tab 
-              icon={<ScheduleIcon />} 
-              label={`Upcoming (${upcomingRehearsals.length})`}
-              iconPosition="start"
-              sx={{ minHeight: 'auto' }}
-            />
-          </Tabs>
-        </Box>
+          <Typography variant="body1" paragraph>
+            Regular rehearsal is key to memorizing verses effectively. Here's how to use the rehearsal schedule:
+          </Typography>
+          <Box component="ol" sx={{ pl: 2 }}>
+            <Typography component="li" sx={{ mb: 1 }}>
+              Practice a verse until you achieve at least 90% accuracy
+            </Typography>
+            <Typography component="li" sx={{ mb: 1 }}>
+              The verse will automatically be added to your rehearsal schedule
+            </Typography>
+            <Typography component="li" sx={{ mb: 1 }}>
+              Follow the schedule to maintain and improve your memorization
+            </Typography>
+            <Typography component="li">
+              Keep practicing to earn points and climb the leaderboard!
+            </Typography>
+          </Box>
+        </Paper>
 
-        <TabPanel value={selectedTab} index={0}>
-          {todayRehearsals.length === 0 ? (
-            <Alert severity="info">No rehearsals scheduled for today!</Alert>
-          ) : (
-            <List>
-              {todayRehearsals.map((rehearsal) => (
-                <ListItem
-                  key={rehearsal.id}
-                  sx={{
-                    mb: 2,
-                    border: '1px solid',
-                    borderColor: 'divider',
-                    borderRadius: 1,
-                  }}
-                >
-                  <ListItemText
-                    primary={rehearsal.reference}
-                    secondary={getRelativeTimeText(rehearsal.scheduledDate)}
-                  />
-                  <ListItemSecondaryAction sx={{ display: 'flex', gap: 1 }}>
-                    <Tooltip title="Reschedule">
-                      <IconButton
-                        edge="end"
-                        onClick={() => handleRescheduleClick(rehearsal.id)}
-                      >
-                        <DateRangeIcon />
-                      </IconButton>
-                    </Tooltip>
-                    <Button
-                      variant="contained"
-                      color="primary"
-                      onClick={() => handlePracticeClick(rehearsal.verseId)}
-                      startIcon={<CheckCircleIcon />}
-                    >
-                      Practice
-                    </Button>
-                  </ListItemSecondaryAction>
-                </ListItem>
-              ))}
-            </List>
-          )}
-        </TabPanel>
+        <Paper elevation={3} sx={{ p: 3 }}>
+          <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+              <CalendarIcon sx={{ mr: 1 }} />
+              <Typography variant="h5" component="h2">
+                Your Schedule
+              </Typography>
+            </Box>
+            
+            <Tabs value={selectedTab} onChange={handleTabChange} aria-label="rehearsal tabs">
+              <Tab 
+                icon={<TodayIcon />} 
+                label={`Today (${todayRehearsals.length})`}
+                iconPosition="start"
+                sx={{ minHeight: 'auto' }}
+              />
+              <Tab 
+                icon={<ScheduleIcon />} 
+                label={`Upcoming (${upcomingRehearsals.length})`}
+                iconPosition="start"
+                sx={{ minHeight: 'auto' }}
+              />
+            </Tabs>
+          </Box>
 
-        <TabPanel value={selectedTab} index={1}>
-          {upcomingRehearsals.length === 0 ? (
-            <Alert severity="info">No upcoming rehearsals scheduled!</Alert>
-          ) : (
-            <List>
-              {upcomingRehearsals.map((rehearsal) => (
-                <ListItem
-                  key={rehearsal.id}
-                  sx={{
-                    mb: 2,
-                    border: '1px solid',
-                    borderColor: 'divider',
-                    borderRadius: 1,
-                  }}
-                >
-                  <ListItemText
-                    primary={rehearsal.reference}
-                    secondary={getRelativeTimeText(rehearsal.scheduledDate)}
-                  />
-                  <ListItemSecondaryAction sx={{ display: 'flex', gap: 1 }}>
-                    <Tooltip title="Reschedule">
-                      <IconButton
-                        edge="end"
-                        onClick={() => handleRescheduleClick(rehearsal.id)}
-                      >
-                        <DateRangeIcon />
-                      </IconButton>
-                    </Tooltip>
-                    <Chip
-                      label={format(rehearsal.scheduledDate, 'MMM d')}
-                      color="primary"
-                      variant="outlined"
+          <TabPanel value={selectedTab} index={0}>
+            {todayRehearsals.length === 0 ? (
+              <Alert severity="info">No rehearsals scheduled for today!</Alert>
+            ) : (
+              <List>
+                {todayRehearsals.map((rehearsal) => (
+                  <ListItem
+                    key={rehearsal.id}
+                    sx={{
+                      mb: 2,
+                      border: '1px solid',
+                      borderColor: 'divider',
+                      borderRadius: 1,
+                    }}
+                  >
+                    <ListItemText
+                      primary={rehearsal.reference}
+                      secondary={getRelativeTimeText(rehearsal.scheduledDate)}
                     />
-                  </ListItemSecondaryAction>
-                </ListItem>
-              ))}
-            </List>
-          )}
-        </TabPanel>
-      </Paper>
+                    <ListItemSecondaryAction sx={{ display: 'flex', gap: 1 }}>
+                      <Tooltip title="Reschedule">
+                        <IconButton
+                          edge="end"
+                          onClick={() => handleRescheduleClick(rehearsal.id)}
+                        >
+                          <DateRangeIcon />
+                        </IconButton>
+                      </Tooltip>
+                      <Button
+                        variant="contained"
+                        color="primary"
+                        onClick={() => handlePracticeClick(rehearsal.verseId)}
+                        startIcon={<CheckCircleIcon />}
+                      >
+                        Practice
+                      </Button>
+                    </ListItemSecondaryAction>
+                  </ListItem>
+                ))}
+              </List>
+            )}
+          </TabPanel>
+
+          <TabPanel value={selectedTab} index={1}>
+            {upcomingRehearsals.length === 0 ? (
+              <Alert severity="info">No upcoming rehearsals scheduled!</Alert>
+            ) : (
+              <List>
+                {upcomingRehearsals.map((rehearsal) => (
+                  <ListItem
+                    key={rehearsal.id}
+                    sx={{
+                      mb: 2,
+                      border: '1px solid',
+                      borderColor: 'divider',
+                      borderRadius: 1,
+                    }}
+                  >
+                    <ListItemText
+                      primary={rehearsal.reference}
+                      secondary={getRelativeTimeText(rehearsal.scheduledDate)}
+                    />
+                    <ListItemSecondaryAction sx={{ display: 'flex', gap: 1 }}>
+                      <Tooltip title="Reschedule">
+                        <IconButton
+                          edge="end"
+                          onClick={() => handleRescheduleClick(rehearsal.id)}
+                        >
+                          <DateRangeIcon />
+                        </IconButton>
+                      </Tooltip>
+                      <Chip
+                        label={format(rehearsal.scheduledDate, 'MMM d')}
+                        color="primary"
+                        variant="outlined"
+                      />
+                    </ListItemSecondaryAction>
+                  </ListItem>
+                ))}
+              </List>
+            )}
+          </TabPanel>
+        </Paper>
+      </Box>
 
       {/* Practice Confirmation Dialog */}
       <Dialog
