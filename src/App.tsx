@@ -12,6 +12,8 @@ import Leaderboard from './pages/Leaderboard';
 import Dashboard from './pages/Dashboard';
 import AddVerse from './pages/AddVerse';
 import EditVerse from './pages/EditVerse';
+import ManageTranslations from './pages/ManageTranslations';
+import Settings from './pages/Settings';
 import { AuthProvider } from './contexts/AuthContext';
 import { useModules } from './hooks/useModules';
 import PrivateRoute from './components/PrivateRoute';
@@ -21,11 +23,16 @@ function AppRoutes() {
 
   return (
     <Routes>
-      <Route path="/" element={<Home />} />
+      {/* Public Routes */}
       <Route path="/register" element={<Register />} />
       <Route path="/login" element={<Login />} />
       
       {/* Protected Routes */}
+      <Route path="/" element={
+        <PrivateRoute>
+          <Dashboard />
+        </PrivateRoute>
+      } />
       <Route path="/dashboard" element={
         <PrivateRoute>
           <Dashboard />
@@ -48,11 +55,6 @@ function AppRoutes() {
       } />
       <Route path="/practice/:verseId" element={
         <PrivateRoute>
-          <Practice />
-        </PrivateRoute>
-      } />
-      <Route path="/practice-verse/:verseId" element={
-        <PrivateRoute>
           <PracticeVerse />
         </PrivateRoute>
       } />
@@ -61,9 +63,19 @@ function AppRoutes() {
           <Leaderboard />
         </PrivateRoute>
       } />
+      <Route path="/translations" element={
+        <PrivateRoute>
+          <ManageTranslations />
+        </PrivateRoute>
+      } />
+      <Route path="/settings" element={
+        <PrivateRoute>
+          <Settings />
+        </PrivateRoute>
+      } />
 
       {/* Catch all route */}
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
   );
 }

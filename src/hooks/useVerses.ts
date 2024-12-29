@@ -9,6 +9,7 @@ import {
   deleteDoc,
   doc,
   serverTimestamp,
+  where,
 } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { useAuth } from '../contexts/AuthContext';
@@ -19,9 +20,10 @@ export interface Verse {
   text: string;
   userId: string;
   createdAt: Date;
+  translation: string;
 }
 
-export function useVerses() {
+export function useVerses(translationFilter?: string) {
   const [verses, setVerses] = useState<Verse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -37,39 +39,40 @@ export function useVerses() {
     setLoading(true);
     setError(null);
 
-    try {
-      const versesRef = collection(db, 'verses');
-      const versesQuery = query(
-        versesRef,
-        orderBy('createdAt', 'desc')
-      );
+    let versesQuery = query(
+      collection(db, 'verses'),
+      orderBy('createdAt', 'desc')
+    );
 
-      const unsubscribe = onSnapshot(
-        versesQuery,
-        (snapshot) => {
-          const versesData = snapshot.docs.map((doc) => ({
-            id: doc.id,
-            ...doc.data(),
-            createdAt: doc.data().createdAt?.toDate() || new Date(),
-          })) as Verse[];
-          setVerses(versesData);
-          setLoading(false);
-          setError(null);
-        },
-        (err) => {
-          console.error('Error fetching verses:', err);
-          setError(err instanceof Error ? err.message : 'An error occurred');
-          setLoading(false);
-        }
+    if (translationFilter) {
+      versesQuery = query(
+        collection(db, 'verses'),
+        orderBy('createdAt', 'desc'),
+        where('translation', '==', translationFilter)
       );
-
-      return () => unsubscribe();
-    } catch (err) {
-      console.error('Error setting up verses listener:', err);
-      setError(err instanceof Error ? err.message : 'An error occurred');
-      setLoading(false);
     }
-  }, [currentUser]);
+
+    const unsubscribe = onSnapshot(
+      versesQuery,
+      (snapshot) => {
+        const versesData = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+          createdAt: doc.data().createdAt?.toDate() || new Date(),
+        })) as Verse[];
+        setVerses(versesData);
+        setLoading(false);
+        setError(null);
+      },
+      (err) => {
+        console.error('Error fetching verses:', err);
+        setError(err instanceof Error ? err.message : 'An error occurred');
+        setLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [currentUser, translationFilter]);
 
   const addVerse = async (verseData: Omit<Verse, 'id' | 'userId' | 'createdAt'>) => {
     if (!currentUser) throw new Error('Must be logged in to add verses');

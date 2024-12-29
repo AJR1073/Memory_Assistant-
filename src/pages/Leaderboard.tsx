@@ -16,17 +16,8 @@ import {
   Whatshot as FireIcon,
   Stars as StarsIcon,
 } from '@mui/icons-material';
-import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
-import { db } from '../firebase/config';
-
-interface LeaderboardEntry {
-  id: string;
-  userId: string;
-  initials: string;
-  totalScore: number;
-  versesMemorized: number;
-  lastUpdated: Date;
-}
+import { useLeaderboard } from '../hooks/useLeaderboard';
+import { useAuth } from '../contexts/AuthContext';
 
 const getRankColor = (rank: number): string => {
   switch (rank) {
@@ -55,37 +46,8 @@ const getRankIcon = (rank: number) => {
 };
 
 export default function Leaderboard() {
-  const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const q = query(
-      collection(db, 'leaderboard'),
-      orderBy('totalScore', 'desc'),
-      limit(10)
-    );
-
-    const unsubscribe = onSnapshot(q, 
-      (snapshot) => {
-        const leaderboardData = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-          lastUpdated: doc.data().lastUpdated?.toDate() || new Date(),
-        })) as LeaderboardEntry[];
-        
-        setEntries(leaderboardData);
-        setLoading(false);
-      },
-      (err) => {
-        console.error('Error in leaderboard listener:', err);
-        setError('Failed to load leaderboard data');
-        setLoading(false);
-      }
-    );
-
-    return () => unsubscribe();
-  }, []);
+  const { entries, loading, error } = useLeaderboard();
+  const { currentUser } = useAuth();
 
   if (loading) {
     return (
@@ -100,9 +62,9 @@ export default function Leaderboard() {
   if (error) {
     return (
       <Container>
-        <Box mt={4}>
-          <Alert severity="error">{error}</Alert>
-        </Box>
+        <Alert severity="error" sx={{ mt: 2 }}>
+          {error}
+        </Alert>
       </Container>
     );
   }

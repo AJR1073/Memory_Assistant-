@@ -19,6 +19,7 @@ import {
   MenuBook,
   TheaterComedy,
   Settings as SettingsIcon,
+  Translate as TranslateIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import { useModules } from '../hooks/useModules';
@@ -54,6 +55,15 @@ function Navigation() {
       console.error('Failed to log out:', error);
     }
   };
+
+  const menuItems = [
+    { text: 'Dashboard', icon: <MenuBook />, path: '/dashboard' },
+    { text: 'Practice', icon: <MenuBook />, path: '/practice' },
+    { text: 'Add Verse', icon: <MenuBook />, path: '/add-verse' },
+    { text: 'Translations', icon: <TranslateIcon />, path: '/translations' },
+    { text: 'Leaderboard', icon: <MenuBook />, path: '/leaderboard' },
+    { text: 'Settings', icon: <SettingsIcon />, path: '/settings' },
+  ];
 
   return (
     <AppBar position="static">
@@ -106,14 +116,23 @@ function Navigation() {
             >
               {currentUser && (
                 <>
-                  <MenuItem component={RouterLink} to="/practice" onClick={handleCloseNavMenu}>
-                    <Typography textAlign="center">Practice</Typography>
-                  </MenuItem>
-                  <MenuItem component={RouterLink} to="/leaderboard" onClick={handleCloseNavMenu}>
-                    <Typography textAlign="center">Leaderboard</Typography>
-                  </MenuItem>
+                  {menuItems.map((item) => (
+                    <MenuItem 
+                      key={item.path}
+                      component={RouterLink} 
+                      to={item.path} 
+                      onClick={handleCloseNavMenu}
+                    >
+                      <Typography textAlign="center">{item.text}</Typography>
+                    </MenuItem>
+                  ))}
                   {hasModuleAccess('acting') && (
-                    <MenuItem component={RouterLink} to="/scripts" onClick={handleCloseNavMenu}>
+                    <MenuItem 
+                      key="scripts"
+                      component={RouterLink} 
+                      to="/scripts" 
+                      onClick={handleCloseNavMenu}
+                    >
                       <Typography textAlign="center">Scripts</Typography>
                     </MenuItem>
                   )}
@@ -143,23 +162,20 @@ function Navigation() {
           <Box sx={{ flexGrow: 1, display: { xs: 'none', md: 'flex' } }}>
             {currentUser && (
               <>
-                <Button
-                  component={RouterLink}
-                  to="/practice"
-                  sx={{ my: 2, color: 'white', display: 'flex', gap: 1 }}
-                >
-                  <MenuBook />
-                  Practice
-                </Button>
-                <Button
-                  component={RouterLink}
-                  to="/leaderboard"
-                  sx={{ my: 2, color: 'white' }}
-                >
-                  Leaderboard
-                </Button>
+                {menuItems.map((item) => (
+                  <Button
+                    key={item.path}
+                    component={RouterLink}
+                    to={item.path}
+                    sx={{ my: 2, color: 'white', display: 'flex', gap: 1 }}
+                  >
+                    {item.icon}
+                    {item.text}
+                  </Button>
+                ))}
                 {hasModuleAccess('acting') && (
                   <Button
+                    key="scripts"
                     component={RouterLink}
                     to="/scripts"
                     sx={{ my: 2, color: 'white', display: 'flex', gap: 1 }}
