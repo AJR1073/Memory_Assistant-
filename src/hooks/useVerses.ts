@@ -41,14 +41,16 @@ export function useVerses(translationFilter?: string) {
 
     let versesQuery = query(
       collection(db, 'verses'),
+      where('userId', '==', currentUser.uid),
       orderBy('createdAt', 'desc')
     );
 
     if (translationFilter) {
       versesQuery = query(
         collection(db, 'verses'),
-        orderBy('createdAt', 'desc'),
-        where('translation', '==', translationFilter)
+        where('userId', '==', currentUser.uid),
+        where('translation', '==', translationFilter),
+        orderBy('createdAt', 'desc')
       );
     }
 

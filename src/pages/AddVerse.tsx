@@ -35,6 +35,8 @@ export default function AddVerse() {
   const [tags, setTags] = useState<string[]>([]);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
 
   // Initialize database with default data
   useEffect(() => {
@@ -51,15 +53,46 @@ export default function AddVerse() {
     }
   }, [translations, translation]);
 
-  if (translationsLoading || booksLoading) {
-    return (
-      <Container maxWidth="md">
-        <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
-          <CircularProgress />
-        </Box>
-      </Container>
-    );
-  }
+  // Track form changes
+  useEffect(() => {
+    if (book || chapter || verse || text || tags.length > 0) {
+      setHasChanges(true);
+    }
+  }, [book, chapter, verse, text, tags]);
+
+  const handleCancel = () => {
+    if (hasChanges) {
+      if (window.confirm('You have unsaved changes. Are you sure you want to leave?')) {
+        navigate('/verses');
+      }
+    } else {
+      navigate('/verses');
+    }
+  };
+
+  const validateForm = () => {
+    if (!text.trim()) {
+      setError('Verse text is required');
+      return false;
+    }
+
+    if (chapter && (isNaN(Number(chapter)) || Number(chapter) < 1)) {
+      setError('Chapter must be a positive number');
+      return false;
+    }
+
+    if (verse && (isNaN(Number(verse)) || Number(verse) < 1)) {
+      setError('Verse must be a positive number');
+      return false;
+    }
+
+    if (text.length > 2000) {
+      setError('Verse text is too long (maximum 2000 characters)');
+      return false;
+    }
+
+    return true;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,12 +101,14 @@ export default function AddVerse() {
       return;
     }
 
-    if (!text.trim()) {
-      setError('Verse text is required');
+    if (!validateForm()) {
       return;
     }
 
     try {
+      setIsSubmitting(true);
+      setError('');
+      
       // Generate reference based on available fields
       let reference = '';
       if (book) {
@@ -93,6 +128,7 @@ export default function AddVerse() {
         text: text.trim(),
         translation,
         reference: reference || 'Custom Verse',
+        userId: currentUser.uid,
         createdBy: currentUser.uid,
         createdAt: new Date(),
         tags
@@ -100,6 +136,8 @@ export default function AddVerse() {
 
       await addDoc(collection(db, 'verses'), verseData);
       setSuccess(true);
+      setHasChanges(false);
+      
       // Clear form
       setBook('');
       setChapter('');
@@ -109,13 +147,25 @@ export default function AddVerse() {
       
       // Navigate after a short delay
       setTimeout(() => {
-        navigate('/dashboard');
+        navigate('/verses');
       }, 2000);
     } catch (err) {
       setError('Failed to add verse. Please try again.');
       console.error('Error adding verse:', err);
+    } finally {
+      setIsSubmitting(false);
     }
   };
+
+  if (translationsLoading || booksLoading) {
+    return (
+      <Container maxWidth="md">
+        <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
+          <CircularProgress />
+        </Box>
+      </Container>
+    );
+  }
 
   return (
     <Container maxWidth="md">
@@ -149,8 +199,8 @@ export default function AddVerse() {
                   fullWidth
                 />
               )}
-              renderOption={(props, option) => (
-                <li {...props}>
+              renderOption={(props, option, state) => (
+                <li {...props} key={option}>
                   <Typography variant="body1">{option}</Typography>
                   <Typography variant="caption" color="textSecondary" sx={{ ml: 1 }}>
                     {books.find(b => b.name === option)?.description}
@@ -168,6 +218,9 @@ export default function AddVerse() {
               value={chapter}
               onChange={(e) => setChapter(e.target.value)}
               fullWidth
+              inputProps={{ min: 1 }}
+              error={!!(chapter && (isNaN(Number(chapter)) || Number(chapter) < 1))}
+              helperText={chapter && (isNaN(Number(chapter)) || Number(chapter) < 1) ? 'Must be a positive number' : ''}
             />
             <TextField
               label="Verse (optional)"
@@ -175,6 +228,9 @@ export default function AddVerse() {
               value={verse}
               onChange={(e) => setVerse(e.target.value)}
               fullWidth
+              inputProps={{ min: 1 }}
+              error={!!(verse && (isNaN(Number(verse)) || Number(verse) < 1))}
+              helperText={verse && (isNaN(Number(verse)) || Number(verse) < 1) ? 'Must be a positive number' : ''}
             />
           </Box>
 
@@ -206,8 +262,14 @@ export default function AddVerse() {
               value={text}
               onChange={(e) => setText(e.target.value)}
               fullWidth
-              error={!text.trim()}
-              helperText={!text.trim() ? 'Verse text is required' : ''}
+              error={!text.trim() || text.length > 2000}
+              helperText={
+                !text.trim() 
+                  ? 'Verse text is required' 
+                  : text.length > 2000 
+                    ? 'Text is too long (maximum 2000 characters)' 
+                    : `${text.length}/2000 characters`
+              }
             />
           </Box>
 
@@ -234,13 +296,20 @@ export default function AddVerse() {
               type="submit"
               variant="contained"
               color="primary"
-              disabled={success}
+              disabled={success || isSubmitting}
             >
-              Add Verse
+              {isSubmitting ? (
+                <>
+                  <CircularProgress size={20} sx={{ mr: 1 }} />
+                  Adding...
+                </>
+              ) : (
+                'Add Verse'
+              )}
             </Button>
             <Button
               variant="outlined"
-              onClick={() => navigate('/dashboard')}
+              onClick={handleCancel}
             >
               Cancel
             </Button>

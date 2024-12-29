@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   Container,
   Typography,
   Box,
-  Button,
-  Card,
-  CardContent,
-  Grid,
+  Paper,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemSecondaryAction,
   IconButton,
+  Button,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -16,133 +17,152 @@ import {
   TextField,
 } from '@mui/material';
 import {
-  Add as AddIcon,
-  Edit as EditIcon,
   Delete as DeleteIcon,
-  TheaterComedy as TheaterIcon,
+  Edit as EditIcon,
+  Add as AddIcon,
 } from '@mui/icons-material';
-import { collection, query, where, getDocs, addDoc, Timestamp } from 'firebase/firestore';
+import { collection, query, orderBy, getDocs, addDoc, deleteDoc, doc, Timestamp } from 'firebase/firestore';
 import { db } from '../../../firebase/config';
 import { useAuth } from '../../../contexts/AuthContext';
-import { Script } from '../types';
+
+interface Script {
+  id: string;
+  title: string;
+  content: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 export default function Scripts() {
-  const [scripts, setScripts] = useState<Script[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [openDialog, setOpenDialog] = useState(false);
-  const [newScript, setNewScript] = useState({ title: '', author: '' });
   const { currentUser } = useAuth();
-  const navigate = useNavigate();
+  const [scripts, setScripts] = useState<Script[]>([]);
+  const [openDialog, setOpenDialog] = useState(false);
+  const [title, setTitle] = useState('');
+  const [content, setContent] = useState('');
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    async function fetchScripts() {
+    const fetchScripts = async () => {
       if (!currentUser) return;
 
       try {
-        const scriptsRef = collection(db, 'scripts');
-        const q = query(scriptsRef, where('createdBy', '==', currentUser.uid));
+        const q = query(
+          collection(db, 'scripts'),
+          orderBy('createdAt', 'desc')
+        );
         const querySnapshot = await getDocs(q);
-        
-        const scriptsList = querySnapshot.docs.map(doc => ({
+        const scriptsData = querySnapshot.docs.map(doc => ({
           id: doc.id,
-          ...doc.data()
+          ...doc.data(),
+          createdAt: (doc.data().createdAt as Timestamp).toDate(),
+          updatedAt: (doc.data().updatedAt as Timestamp).toDate(),
         })) as Script[];
-
-        setScripts(scriptsList);
-      } catch (error) {
-        console.error('Error fetching scripts:', error);
-      } finally {
-        setLoading(false);
+        setScripts(scriptsData);
+      } catch (err) {
+        console.error('Error fetching scripts:', err);
+        setError('Failed to load scripts');
       }
-    }
+    };
 
     fetchScripts();
   }, [currentUser]);
 
-  const handleCreateScript = async () => {
-    if (!currentUser || !newScript.title.trim()) return;
+  const handleAdd = async () => {
+    if (!currentUser || !title.trim() || !content.trim()) return;
 
     try {
-      const newScriptData: Partial<Script> = {
-        title: newScript.title,
-        author: newScript.author,
-        characters: [],
-        scenes: [],
-        createdBy: currentUser.uid,
-        createdAt: Timestamp.now(),
-        updatedAt: Timestamp.now(),
-      };
-
-      const docRef = await addDoc(collection(db, 'scripts'), newScriptData);
-      setScripts([...scripts, { ...newScriptData, id: docRef.id } as Script]);
+      const now = new Date();
+      await addDoc(collection(db, 'scripts'), {
+        title,
+        content,
+        userId: currentUser.uid,
+        createdAt: Timestamp.fromDate(now),
+        updatedAt: Timestamp.fromDate(now),
+      });
+      setTitle('');
+      setContent('');
       setOpenDialog(false);
-      setNewScript({ title: '', author: '' });
-    } catch (error) {
-      console.error('Error creating script:', error);
+      // Refresh scripts list
+      const q = query(
+        collection(db, 'scripts'),
+        orderBy('createdAt', 'desc')
+      );
+      const querySnapshot = await getDocs(q);
+      const scriptsData = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        createdAt: (doc.data().createdAt as Timestamp).toDate(),
+        updatedAt: (doc.data().updatedAt as Timestamp).toDate(),
+      })) as Script[];
+      setScripts(scriptsData);
+    } catch (err) {
+      console.error('Error adding script:', err);
+      setError('Failed to add script');
+    }
+  };
+
+  const handleDelete = async (scriptId: string) => {
+    if (!currentUser) return;
+
+    try {
+      await deleteDoc(doc(db, 'scripts', scriptId));
+      setScripts(scripts.filter(script => script.id !== scriptId));
+    } catch (err) {
+      console.error('Error deleting script:', err);
+      setError('Failed to delete script');
     }
   };
 
   return (
-    <Container maxWidth="lg">
+    <Container>
       <Box sx={{ py: 4 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-          <Typography variant="h4" component="h1" sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <TheaterIcon sx={{ fontSize: 40 }} />
-            My Scripts
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+          <Typography variant="h4" component="h1">
+            Scripts
           </Typography>
           <Button
             variant="contained"
             startIcon={<AddIcon />}
             onClick={() => setOpenDialog(true)}
           >
-            Add New Script
+            Add Script
           </Button>
         </Box>
 
-        <Grid container spacing={3}>
-          {scripts.map((script) => (
-            <Grid item xs={12} md={4} key={script.id}>
-              <Card 
-                sx={{ 
-                  height: '100%',
-                  transition: 'transform 0.2s',
-                  '&:hover': {
-                    transform: 'translateY(-4px)',
-                  }
-                }}
-              >
-                <CardContent>
-                  <Typography variant="h6" gutterBottom>
-                    {script.title}
-                  </Typography>
-                  {script.author && (
-                    <Typography variant="body2" color="text.secondary" gutterBottom>
-                      by {script.author}
-                    </Typography>
-                  )}
-                  <Typography variant="body2" color="text.secondary">
-                    {script.characters?.length || 0} characters • {script.scenes?.length || 0} scenes
-                  </Typography>
-                  <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      onClick={() => navigate(`/scripts/${script.id}`)}
-                    >
-                      Open
-                    </Button>
-                    <IconButton size="small">
-                      <EditIcon />
-                    </IconButton>
-                    <IconButton size="small" color="error">
-                      <DeleteIcon />
-                    </IconButton>
-                  </Box>
-                </CardContent>
-              </Card>
-            </Grid>
-          ))}
-        </Grid>
+        {error && (
+          <Paper sx={{ p: 2, mb: 2, bgcolor: 'error.light', color: 'error.contrastText' }}>
+            {error}
+          </Paper>
+        )}
+
+        <Paper>
+          <List>
+            {scripts.map((script) => (
+              <ListItem key={script.id}>
+                <ListItemText
+                  primary={script.title}
+                  secondary={`Last updated: ${script.updatedAt.toLocaleDateString()}`}
+                />
+                <ListItemSecondaryAction>
+                  <IconButton
+                    edge="end"
+                    aria-label="edit"
+                    onClick={() => {/* TODO: Implement edit */}}
+                  >
+                    <EditIcon />
+                  </IconButton>
+                  <IconButton
+                    edge="end"
+                    aria-label="delete"
+                    onClick={() => handleDelete(script.id)}
+                  >
+                    <DeleteIcon />
+                  </IconButton>
+                </ListItemSecondaryAction>
+              </ListItem>
+            ))}
+          </List>
+        </Paper>
 
         <Dialog open={openDialog} onClose={() => setOpenDialog(false)}>
           <DialogTitle>Add New Script</DialogTitle>
@@ -150,23 +170,25 @@ export default function Scripts() {
             <TextField
               autoFocus
               margin="dense"
-              label="Script Title"
+              label="Title"
               fullWidth
-              value={newScript.title}
-              onChange={(e) => setNewScript({ ...newScript, title: e.target.value })}
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
             />
             <TextField
               margin="dense"
-              label="Author (optional)"
+              label="Content"
               fullWidth
-              value={newScript.author}
-              onChange={(e) => setNewScript({ ...newScript, author: e.target.value })}
+              multiline
+              rows={4}
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
             />
           </DialogContent>
           <DialogActions>
             <Button onClick={() => setOpenDialog(false)}>Cancel</Button>
-            <Button onClick={handleCreateScript} variant="contained">
-              Create
+            <Button onClick={handleAdd} variant="contained" disabled={!title.trim() || !content.trim()}>
+              Add
             </Button>
           </DialogActions>
         </Dialog>

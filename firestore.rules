@@ -8,13 +8,22 @@ service cloud.firestore {
 
     // Allow authenticated users to read and write their own data
     match /users/{userId} {
-      allow read, write: if isSignedIn() && request.auth.uid == userId;
+      allow read: if isSignedIn();  // Allow all authenticated users to read user data for leaderboard
+      allow write: if isSignedIn() && request.auth.uid == userId;
     }
 
-    // Allow authenticated users to read and write verses
+    // Allow authenticated users to read and write only their own verses
     match /verses/{verseId} {
+      allow read, write: if isSignedIn() && request.auth.uid == resource.data.userId;
+      allow create: if isSignedIn() && request.auth.uid == request.resource.data.userId;
+    }
+
+    // Allow all authenticated users to read public library verses
+    // but only the owner can edit their contributed verses
+    match /publicLibrary/{verseId} {
       allow read: if isSignedIn();
-      allow write: if isSignedIn();
+      allow create: if isSignedIn() && request.auth.uid == request.resource.data.contributedBy;
+      allow update, delete: if isSignedIn() && request.auth.uid == resource.data.contributedBy;
     }
 
     // Allow authenticated users to read and write translations
@@ -39,20 +48,6 @@ service cloud.firestore {
     match /userModules/{userModuleId} {
       allow read: if isSignedIn();
       allow write: if isSignedIn();
-    }
-
-    // Allow all authenticated users to read leaderboard
-    match /leaderboard/{entryId} {
-      allow read: if isSignedIn();
-      // Allow users to write only their own entries
-      allow write: if isSignedIn() && 
-                   (request.resource.data.userId == request.auth.uid);
-      allow create: if isSignedIn() && 
-                    (request.resource.data.userId == request.auth.uid);
-      allow update: if isSignedIn() && 
-                    (resource.data.userId == request.auth.uid);
-      allow delete: if isSignedIn() && 
-                    (resource.data.userId == request.auth.uid);
     }
 
     // Allow users to manage their rehearsal schedules

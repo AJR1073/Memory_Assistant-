@@ -1,154 +1,195 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
 import {
   Container,
   Typography,
-  TextField,
-  Button,
   Box,
-  Alert,
   CircularProgress,
+  Alert,
   Paper,
   IconButton,
   Tooltip,
-  Chip,
+  TextField,
+  Button,
 } from '@mui/material';
 import {
+  Stop as StopIcon,
   Mic as MicIcon,
-  MicOff as MicOffIcon,
-  Visibility as VisibilityIcon,
-  VisibilityOff as VisibilityOffIcon,
+  VolumeUp as SpeakIcon,
+  Check as CheckIcon,
 } from '@mui/icons-material';
-import { useVerses } from '../hooks/useVerses';
-import { useTranslations } from '../hooks/useTranslations';
-import { useBrowserSpeechRecognition } from '../hooks/useBrowserSpeechRecognition';
-import { useAuth } from '../contexts/AuthContext';
-import { useLeaderboard } from '../hooks/useLeaderboard';
-import { useRehearsal } from '../hooks/useRehearsal';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase/config';
-import { compareTexts, generateHighlightedText } from '../utils/textComparison';
-import '../styles/verseHighlight.css';
+
+interface Verse {
+  id: string;
+  reference: string;
+  text: string;
+  translation: string;
+}
+
+interface SpeechSynthesis {
+  speak: (text: string) => void;
+  speaking: boolean;
+  cancel: () => void;
+}
+
+interface SpeechRecognition {
+  startListening: () => Promise<void>;
+  stopListening: () => Promise<void>;
+}
+
+// Real speech synthesis implementation
+const useSpeechSynthesis = () => {
+  const synth = window.speechSynthesis;
+
+  return {
+    speak: (text: string) => {
+      const utterance = new SpeechSynthesisUtterance(text);
+      synth.speak(utterance);
+    },
+    speaking: synth.speaking,
+    cancel: () => synth.cancel(),
+  };
+};
+
+// Real speech recognition implementation
+const useSpeechRecognition = ({ onResult }: { onResult: (text: string) => void }) => {
+  const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+  
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  
+  recognition.onresult = (event) => {
+    const transcript = Array.from(event.results)
+      .map(result => result[0].transcript)
+      .join(' ');
+    onResult(transcript);
+  };
+
+  return {
+    startListening: async () => {
+      try {
+        await recognition.start();
+      } catch (error) {
+        console.error('Speech recognition error:', error);
+      }
+    },
+    stopListening: async () => {
+      try {
+        recognition.stop();
+      } catch (error) {
+        console.error('Error stopping speech recognition:', error);
+      }
+    },
+  };
+};
+
+// Add TypeScript declarations for the Web Speech API
+declare global {
+  interface Window {
+    SpeechRecognition: any;
+    webkitSpeechRecognition: any;
+    speechSynthesis: SpeechSynthesis;
+  }
+}
 
 export default function PracticeVerse() {
   const { verseId } = useParams<{ verseId: string }>();
-  const navigate = useNavigate();
-  const { verses, loading } = useVerses();
-  const { translations } = useTranslations();
-  const { currentUser } = useAuth();
-  const { updateUserScore } = useLeaderboard();
-  const { scheduleRehearsal, completeRehearsal } = useRehearsal();
-  
-  const [userInput, setUserInput] = useState('');
-  const [score, setScore] = useState(0);
-  const [feedback, setFeedback] = useState<string | null>(null);
-  const [showAnswer, setShowAnswer] = useState(false);
-  const [isCorrect, setIsCorrect] = useState(false);
-  const [practiceCount, setPracticeCount] = useState(0);
-  const [showVerse, setShowVerse] = useState(false);
-  const [comparisonResult, setComparisonResult] = useState<{
-    missingWords: string[];
-    extraWords: string[];
-    synonymsUsed: { used: string; reference: string }[];
-  } | null>(null);
-
+  const [verse, setVerse] = useState<Verse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [isListening, setIsListening] = useState(false);
+  const [spokenText, setSpokenText] = useState('');
+  const [accuracy, setAccuracy] = useState<number | null>(null);
+  const [typedText, setTypedText] = useState('');
+  const [showTypedAccuracy, setShowTypedAccuracy] = useState<number | null>(null);
 
-  const verse = verses.find(v => v.id === verseId);
-
-  const {
-    transcript,
-    listening,
-    startListening,
-    stopListening,
-    resetTranscript,
-    browserSupportsSpeechRecognition
-  } = useBrowserSpeechRecognition();
+  const { speak, speaking, cancel } = useSpeechSynthesis();
+  const { startListening, stopListening } = useSpeechRecognition({
+    onResult: (text: string) => {
+      const cleanText = text.trim();
+      setSpokenText(cleanText);
+      setTypedText(cleanText);
+      if (verse) {
+        const score = calculateAccuracy(cleanText, verse.text);
+        setAccuracy(score);
+        setShowTypedAccuracy(score);
+      }
+    },
+  });
 
   useEffect(() => {
-    if (transcript) {
-      setUserInput(transcript);
+    const fetchVerse = async () => {
+      if (!verseId) return;
+
+      try {
+        const verseDoc = await getDoc(doc(db, 'verses', verseId));
+        if (verseDoc.exists()) {
+          setVerse({ id: verseDoc.id, ...verseDoc.data() } as Verse);
+        } else {
+          setError('Verse not found');
+        }
+      } catch (err) {
+        console.error('Error fetching verse:', err);
+        setError('Failed to load verse');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchVerse();
+  }, [verseId]);
+
+  const handleStartListening = async () => {
+    setIsListening(true);
+    setSpokenText('');
+    setTypedText('');
+    setAccuracy(null);
+    setShowTypedAccuracy(null);
+    await startListening();
+  };
+
+  const handleStopListening = async () => {
+    setIsListening(false);
+    await stopListening();
+  };
+
+  const handleSpeak = () => {
+    if (verse) {
+      speak(verse.text);
     }
-  }, [transcript]);
+  };
 
-  useEffect(() => {
-    if (!verse && !loading) {
-      navigate('/verses');
-    }
-  }, [loading, verse, navigate]);
+  const calculateAccuracy = (spoken: string, actual: string): number => {
+    // Normalize both texts: lowercase, remove punctuation, and split into words
+    const normalize = (text: string) => 
+      text.toLowerCase()
+          .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, '')
+          .split(/\s+/)
+          .filter(word => word.length > 0);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!verse || !currentUser) return;
-
-    const comparison = compareTexts(verse.text, userInput);
-    const isMatch = comparison.accuracy >= 0.9;
-    setScore(Math.round(comparison.accuracy * 100));
-    setIsCorrect(isMatch);
-    setShowAnswer(true);
-    setComparisonResult({
-      missingWords: comparison.missingWords,
-      extraWords: comparison.extraWords,
-      synonymsUsed: comparison.synonymsUsed
+    const spokenWords = normalize(spoken);
+    const actualWords = normalize(actual);
+    
+    let matches = 0;
+    actualWords.forEach((word, i) => {
+      if (i < spokenWords.length && spokenWords[i] === word) {
+        matches++;
+      }
     });
+    
+    return (matches / actualWords.length) * 100;
+  };
 
-    if (isMatch) {
-      setFeedback('Great job! The verse matches perfectly!');
-      try {
-        // Update practice stats
-        const practiceRef = doc(db, 'verses', verseId, 'practices', currentUser.uid);
-        const practiceDoc = await getDoc(practiceRef);
-        const currentCount = practiceDoc.exists() ? practiceDoc.data().count || 0 : 0;
-        const newCount = currentCount + 1;
-        
-        await setDoc(practiceRef, {
-          userId: currentUser.uid,
-          count: newCount,
-          lastPracticed: new Date(),
-          accuracy: comparison.accuracy
-        });
-
-        setPracticeCount(newCount);
-
-        // Update user's score in leaderboard
-        await updateUserScore(newCount * 100, newCount);
-
-        // Schedule next rehearsal
-        await scheduleRehearsal(verseId, verse.reference);
-
-      } catch (error) {
-        console.error('Error updating practice stats:', error);
-      }
-    } else {
-      setFeedback(`Accuracy: ${Math.round(comparison.accuracy * 100)}%`);
+  const handleCheckTyped = () => {
+    if (verse) {
+      const score = calculateAccuracy(typedText, verse.text);
+      setShowTypedAccuracy(score);
     }
   };
 
-  const handleTryAgain = () => {
-    setUserInput('');
-    setScore(0);
-    setFeedback(null);
-    setShowAnswer(false);
-    setShowVerse(false);
-    setComparisonResult(null);
-    resetTranscript();
-  };
-
-  const toggleListening = async () => {
-    if (isListening) {
-      stopListening();
-      setIsListening(false);
-    } else {
-      try {
-        await startListening();
-        setIsListening(true);
-      } catch (error) {
-        console.error('Error starting speech recognition:', error);
-      }
-    }
-  };
-
-  if (loading || !verse) {
+  if (loading) {
     return (
       <Container>
         <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
@@ -158,136 +199,96 @@ export default function PracticeVerse() {
     );
   }
 
+  if (error || !verse) {
+    return (
+      <Container>
+        <Alert severity="error" sx={{ mt: 2 }}>
+          {error || 'Verse not found'}
+        </Alert>
+      </Container>
+    );
+  }
+
   return (
-    <Container maxWidth="md">
-      <Paper elevation={3} sx={{ p: 4, mt: 4 }}>
-        <Box component="form" onSubmit={handleSubmit}>
-          <Typography variant="h4" component="h1" gutterBottom>
-            Practice Verse
-          </Typography>
-          <Typography variant="subtitle1" color="text.secondary" gutterBottom>
+    <Container>
+      <Box sx={{ py: 4 }}>
+        <Typography variant="h4" component="h1" gutterBottom>
+          Practice Verse
+        </Typography>
+        
+        <Paper sx={{ p: 3, mb: 3 }}>
+          <Typography variant="h6" gutterBottom>
             {verse.reference} ({verse.translation})
           </Typography>
+          <Typography variant="body1" paragraph>
+            {verse.text}
+          </Typography>
           
-          {/* Toggle Verse Visibility */}
-          <Box sx={{ mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
-            <Tooltip title={showVerse ? "Hide verse" : "Show verse"}>
-              <IconButton onClick={() => setShowVerse(!showVerse)}>
-                {showVerse ? <VisibilityOffIcon /> : <VisibilityIcon />}
+          <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
+            <Tooltip title="Speak verse">
+              <IconButton onClick={handleSpeak} disabled={speaking}>
+                <SpeakIcon />
               </IconButton>
             </Tooltip>
-          </Box>
-
-          {/* Verse Text - Only shown if showVerse is true or after checking */}
-          {(showVerse || showAnswer) && (
-            <Paper variant="outlined" sx={{ p: 2, mb: 3, bgcolor: 'background.default' }}>
-              {showAnswer ? (
-                <Box className="verse-comparison">
-                  <div dangerouslySetInnerHTML={{ 
-                    __html: generateHighlightedText(verse.text, userInput)
-                  }} />
-                  {comparisonResult && (
-                    <Box sx={{ mt: 2 }}>
-                      {comparisonResult.missingWords.length > 0 && (
-                        <Box sx={{ mb: 1 }}>
-                          <Typography variant="subtitle2" color="error">Missing Words:</Typography>
-                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                            {comparisonResult.missingWords.map((word, index) => (
-                              <Chip key={index} label={word} color="error" size="small" />
-                            ))}
-                          </Box>
-                        </Box>
-                      )}
-                      {comparisonResult.extraWords.length > 0 && (
-                        <Box sx={{ mb: 1 }}>
-                          <Typography variant="subtitle2" color="warning.main">Extra Words:</Typography>
-                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                            {comparisonResult.extraWords.map((word, index) => (
-                              <Chip key={index} label={word} color="warning" size="small" />
-                            ))}
-                          </Box>
-                        </Box>
-                      )}
-                      {comparisonResult.synonymsUsed.length > 0 && (
-                        <Box sx={{ mb: 1 }}>
-                          <Typography variant="subtitle2" color="info.main">Synonyms Used:</Typography>
-                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                            {comparisonResult.synonymsUsed.map((syn, index) => (
-                              <Chip 
-                                key={index} 
-                                label={`${syn.used} → ${syn.reference}`} 
-                                color="info" 
-                                size="small" 
-                              />
-                            ))}
-                          </Box>
-                        </Box>
-                      )}
-                    </Box>
-                  )}
-                </Box>
-              ) : (
-                <Typography variant="body1">{verse.text}</Typography>
-              )}
-            </Paper>
-          )}
-
-          <TextField
-            fullWidth
-            multiline
-            rows={4}
-            variant="outlined"
-            value={userInput}
-            onChange={(e) => setUserInput(e.target.value)}
-            placeholder="Type or speak the verse from memory..."
-            sx={{ mb: 2 }}
-          />
-
-          <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-            {browserSupportsSpeechRecognition && (
-              <Tooltip title={isListening ? "Stop recording" : "Start recording"}>
-                <IconButton 
-                  onClick={toggleListening}
-                  color={isListening ? "error" : "primary"}
-                >
-                  {isListening ? <MicOffIcon /> : <MicIcon />}
+            
+            {!isListening ? (
+              <Tooltip title="Start recording">
+                <IconButton onClick={handleStartListening} color="primary">
+                  <MicIcon />
+                </IconButton>
+              </Tooltip>
+            ) : (
+              <Tooltip title="Stop recording">
+                <IconButton onClick={handleStopListening} color="error">
+                  <StopIcon />
                 </IconButton>
               </Tooltip>
             )}
           </Box>
 
-          {feedback && (
-            <Alert 
-              severity={isCorrect ? "success" : "info"} 
-              sx={{ mb: 2 }} 
-              onClose={() => setFeedback(null)}
-            >
-              {feedback}
-            </Alert>
-          )}
-
-          <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
-            {showAnswer ? (
-              <Button
-                variant="outlined"
-                onClick={handleTryAgain}
-                color="primary"
-              >
-                Try Again
-              </Button>
-            ) : (
+          {/* Text input section */}
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="h6" gutterBottom>
+              Type the verse:
+            </Typography>
+            <TextField
+              fullWidth
+              multiline
+              rows={4}
+              value={typedText}
+              onChange={(e) => {
+                setTypedText(e.target.value);
+                setShowTypedAccuracy(null);
+              }}
+              placeholder={isListening ? "Speaking..." : "Type the verse here or use the microphone..."}
+              sx={{ mb: 2 }}
+            />
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <Button
                 variant="contained"
-                type="submit"
-                color="primary"
-                disabled={!userInput.trim()}
+                startIcon={<CheckIcon />}
+                onClick={handleCheckTyped}
+                disabled={!typedText}
               >
-                Check
+                Check Text
               </Button>
-            )}
+              {showTypedAccuracy !== null && (
+                <Typography variant="h6" color={showTypedAccuracy > 90 ? 'success.main' : 'warning.main'}>
+                  Accuracy: {showTypedAccuracy.toFixed(1)}%
+                </Typography>
+              )}
+            </Box>
           </Box>
-        </Box>
-      </Paper>
+
+          {accuracy !== null && (
+            <Box sx={{ mt: 3 }}>
+              <Typography variant="h6" color={accuracy > 90 ? 'success.main' : 'warning.main'}>
+                Speech Accuracy: {accuracy.toFixed(1)}%
+              </Typography>
+            </Box>
+          )}
+        </Paper>
+      </Box>
     </Container>
   );
 }

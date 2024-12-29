@@ -151,10 +151,10 @@ export default function Dashboard() {
           variant="contained"
           color="primary"
           startIcon={<AddIcon />}
-          onClick={() => navigate('/add-verse')}
+          onClick={() => navigate('/verses/add')}
           sx={{ mb: 3 }}
         >
-          Add New Verse
+          Add Verse
         </Button>
       </Box>
 

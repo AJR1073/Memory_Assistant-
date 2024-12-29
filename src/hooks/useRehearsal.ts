@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, doc, setDoc, getDocs, query, where, orderBy, onSnapshot } from 'firebase/firestore';
+import { collection, doc, setDoc, query, where, orderBy, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { useAuth } from '../contexts/AuthContext';
 import { addDays, isAfter, isBefore, startOfDay } from 'date-fns';

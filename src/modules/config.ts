@@ -1,5 +1,4 @@
 import { Module } from './types';
-import { MenuBook, TheaterComedy } from '@mui/icons-material';
 
 export const moduleConfig: Record<string, Module> = {
   scripture: {
