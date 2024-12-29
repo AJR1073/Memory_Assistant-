@@ -96,13 +96,13 @@ export default function Leaderboard() {
                 elevation={3}
                 sx={{
                   p: 3,
+                  flex: 1,
+                  maxWidth: 200,
+                  ...getPositionStyle(index),
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
                   gap: 1,
-                  flex: 1,
-                  maxWidth: 200,
-                  ...getPositionStyle(index),
                 }}
               >
                 <WorkspacePremiumIcon 
